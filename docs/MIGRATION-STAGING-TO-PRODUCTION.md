@@ -65,6 +65,8 @@ UIPATH_PROJECT_ID=<PRODUCTION_STUDIO_PROJECT_GUID>
 
 ### Faza 3 — Redirect URI (Production)
 
+Pełny opis OAuth i redirect: **[OAUTH-AND-REDIRECT.md](OAUTH-AND-REDIRECT.md)**.
+
 Zarejestruj w External Application **oba** hosty (nazwa org i GUID org), z i bez `/`:
 
 ```

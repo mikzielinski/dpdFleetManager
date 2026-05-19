@@ -35,6 +35,10 @@ Plik: `.uipath/deploy-config.staging.json`
 | `MAESTRO_FOLDER_PATH` | `Shared/DPDDataInvestigator` |
 | `MAESTRO_INPUT_RECORD_ARG` | `InRecord_Id` |
 
+## OAuth i Redirect URI
+
+Pełny przewodnik: **[OAUTH-AND-REDIRECT.md](OAUTH-AND-REDIRECT.md)** (External Application, lista URI, błędy, flow PKCE).
+
 ## Zmienne `VITE_*` (build-time)
 
 | Zmienna | Opis |

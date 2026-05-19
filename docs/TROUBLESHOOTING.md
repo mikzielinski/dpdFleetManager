@@ -48,9 +48,12 @@ Komunikaty z **rozszerzeń przeglądarki** (Chrome), nie z aplikacji DPD. Testuj
 
 ## OAuth: redirect_uri mismatch
 
+Szczegóły: **[OAUTH-AND-REDIRECT.md](OAUTH-AND-REDIRECT.md)** (sekcje 3–4 i 8).
+
 1. Porównaj dokładny URL z paska (bez query) z listą w External Application.
 2. Zarejestruj warianty z `/` i bez `/`, org name i org GUID host.
 3. Na hosted nie ustawiaj sztywnego `VITE_UIPATH_REDIRECT_URI` jeśli koliduje z meta tagiem.
+4. Skopiuj `redirect_uri` z ekranu błędu logowania w aplikacji (Fleet Manager pokazuje listę URI).
 
 ## Pusta faktura
 

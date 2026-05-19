@@ -7,7 +7,8 @@ Pełna dokumentacja projektu **UiPath Coded Web App** dla managera floty DPD.
 | Dokument | Opis |
 |----------|------|
 | [Architektura](ARCHITECTURE.md) | Komponenty, przepływ danych, integracje |
-| [Development](DEVELOPMENT.md) | Lokalny dev, `.env`, OAuth, struktura kodu |
+| [Development](DEVELOPMENT.md) | Lokalny dev, `.env`, struktura kodu |
+| [**OAuth i Redirect URI**](OAUTH-AND-REDIRECT.md) | External Application, PKCE, `redirect_uri`, błędy logowania |
 | [Deploy — Staging](DEPLOY-STAGING.md) | Build, publish, deploy na staging |
 | [Migracja Staging → Production](MIGRATION-STAGING-TO-PRODUCTION.md) | Przeniesienie na Automation Cloud (produkcja) |
 | [Testowanie](TESTING.md) | Checklisty QA po wdrożeniu |

@@ -56,21 +56,13 @@ W External Application zarejestruj:
 - `http://localhost:5173`
 - `http://localhost:5173/`
 
-## Redirect URI (OAuth)
+## OAuth i Redirect URI
 
-SDK wysyła `redirect_uri = origin + pathname` (bez query).
+Pełna dokumentacja (External Application, PKCE, lista URI, błędy, migracja):
 
-Dla hosted staging — zarejestruj **wszystkie** warianty:
+**[docs/OAUTH-AND-REDIRECT.md](OAUTH-AND-REDIRECT.md)**
 
-```
-https://<org-name>.staging.uipath.host/dpdmonitoring
-https://<org-name>.staging.uipath.host/dpdmonitoring/
-https://<org-guid>.staging.uipath.host/dpdmonitoring
-https://<org-guid>.staging.uipath.host/dpdmonitoring/
-```
-
-Portal staging:  
-https://staging.uipath.com/mzpocevylrxu/portal_/admin/external-apps/oauth
+Skrót: SDK wysyła `redirect_uri = origin + pathname` (bez query). Na hosted priorytet ma meta `uipath:redirect-uri` z deployu.
 
 ## Struktura katalogów
 

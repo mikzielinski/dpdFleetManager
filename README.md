@@ -19,6 +19,7 @@ UiPath **Coded Web App** dla managera floty DPD: koszty kierowców z Data Fabric
 | Spis treści | [docs/README.md](docs/README.md) |
 | Architektura | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Development | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| **OAuth i Redirect URI** | [docs/OAUTH-AND-REDIRECT.md](docs/OAUTH-AND-REDIRECT.md) |
 | Deploy staging | [docs/DEPLOY-STAGING.md](docs/DEPLOY-STAGING.md) |
 | **Migracja staging → production** | [docs/MIGRATION-STAGING-TO-PRODUCTION.md](docs/MIGRATION-STAGING-TO-PRODUCTION.md) |
 | Testowanie | [docs/TESTING.md](docs/TESTING.md) |
