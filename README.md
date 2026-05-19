@@ -1,6 +1,6 @@
 # dpd-fleet-manager — DPD Fleet Manager (UiPath Coded Web App)
 
-Panel managera floty DPD do przegladu kosztów kierowców, podglądu faktur i uruchamiania analizy Maestro (`DPDDataInvestigator`) bezpośrednio z poziomu Coded Web App.
+Panel managera floty DPD do przeglądu kosztów kierowców, podglądu faktur i uruchamiania analizy Maestro (`DPDDataInvestigator`) bezpośrednio z poziomu Coded Web App.
 
 ![UiPath Coded Web App](https://img.shields.io/badge/UiPath-Coded%20Web%20App-orange)
 ![TypeScript 5.x](https://img.shields.io/badge/TypeScript-5.x-3178c6)
