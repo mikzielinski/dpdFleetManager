@@ -1,16 +1,45 @@
-# DPD Fleet Manager
+# dpd-fleet-manager — DPD Fleet Manager (UiPath Coded Web App)
 
-UiPath **Coded Web App** dla managera floty DPD: koszty kierowców z Data Fabric, podgląd faktur (PDF), analiza Maestro **DPDDataInvestigator**, historia flag pojazdu.
+Panel managera floty DPD do przegladu kosztów kierowców, podglądu faktur i uruchamiania analizy Maestro (`DPDDataInvestigator`) bezpośrednio z poziomu Coded Web App.
 
-**Repozytorium:** https://github.com/mikzielinski/dpdFleetManager
+![UiPath Coded Web App](https://img.shields.io/badge/UiPath-Coded%20Web%20App-orange)
+![TypeScript 5.x](https://img.shields.io/badge/TypeScript-5.x-3178c6)
 
-## Funkcje
+## Features
 
-- Tabela rekordów z encji **DPD_POC** (Data Fabric)
-- Podgląd faktury (PDF / obraz) z pola pliku rekordu
-- Uruchomienie i polling procesu **DPDDataInvestigator** (Maestro)
-- Historia z **DPD_VehicleFlags** (po dopasowaniu Vehicle ID do numeru rejestracyjnego)
-- OAuth 2.0 PKCE (External Application)
+- Dashboard rekordów z **Data Fabric** (`DPD_POC`)
+- Podgląd faktury (**PDF/obraz**) zapisanej w rekordzie
+- Uruchamianie i polling procesu Maestro **`DPDDataInvestigator`**
+- Historia flag z **`DPD_VehicleFlags`** po dopasowaniu Vehicle ID
+- Integracja **OAuth 2.0 PKCE** (External Application)
+
+## Quick start
+
+```powershell
+git clone https://github.com/mikzielinski/dpdFleetManager.git
+cd dpdFleetManager
+npm install
+copy .env.example .env
+# Ustaw `VITE_UIPATH_CLIENT_ID` w `.env`
+
+npm run dev      # lokalny preview (Vite)
+npm run build    # bundle produkcyjny do dist/
+npm run preview  # podgląd buildu lokalnie
+```
+
+## Deploy (UiPath)
+
+```powershell
+uip login --organization mzpocevylrxu --tenant DefaultTenant
+
+# Staging (domyślnie)
+.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
+
+# Production (po przygotowaniu deploy-config.production.json)
+.\.uipath\deploy-dpdmonitoring.ps1 1.0.0 -Environment production
+```
+
+> Nie używaj przycisku Orchestrator "Upgrade to latest" - znany problem API. Do deployu korzystaj ze skryptu (szczegóły: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)).
 
 ## Dokumentacja
 
@@ -19,9 +48,9 @@ UiPath **Coded Web App** dla managera floty DPD: koszty kierowców z Data Fabric
 | Spis treści | [docs/README.md](docs/README.md) |
 | Architektura | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Development | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
-| **OAuth i Redirect URI** | [docs/OAUTH-AND-REDIRECT.md](docs/OAUTH-AND-REDIRECT.md) |
+| OAuth i Redirect URI | [docs/OAUTH-AND-REDIRECT.md](docs/OAUTH-AND-REDIRECT.md) |
 | Deploy staging | [docs/DEPLOY-STAGING.md](docs/DEPLOY-STAGING.md) |
-| **Migracja staging → production** | [docs/MIGRATION-STAGING-TO-PRODUCTION.md](docs/MIGRATION-STAGING-TO-PRODUCTION.md) |
+| Migracja staging -> production | [docs/MIGRATION-STAGING-TO-PRODUCTION.md](docs/MIGRATION-STAGING-TO-PRODUCTION.md) |
 | Testowanie | [docs/TESTING.md](docs/TESTING.md) |
 | Troubleshooting | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Referencja konfiguracji | [docs/CONFIGURATION-REFERENCE.md](docs/CONFIGURATION-REFERENCE.md) |
@@ -32,40 +61,6 @@ UiPath **Coded Web App** dla managera floty DPD: koszty kierowców z Data Fabric
 - [UiPath CLI](https://github.com/UiPath/uipath-cli) (`uip`) + `@uipath/codedapp-tool`
 - External Application (Non-Confidential, PKCE) w Automation Cloud
 
-## Szybki start (staging)
-
-```powershell
-git clone https://github.com/mikzielinski/dpdFleetManager.git
-cd dpdFleetManager
-copy .env.example .env
-# Uzupełnij VITE_UIPATH_CLIENT_ID w .env
-npm install
-uip login --organization mzpocevylrxu --tenant DefaultTenant
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
-```
-
-**Aplikacja:** https://mzpocevylrxu.staging.uipath.host/dpdmonitoring/
-
-## Skrypty npm
-
-| Polecenie | Opis |
-|-----------|------|
-| `npm run dev` | Serwer deweloperski Vite |
-| `npm run build` | Kompilacja TypeScript + bundle produkcyjny |
-| `npm run preview` | Podgląd lokalny buildu |
-
-## Deploy
-
-```powershell
-# Staging (domyślnie)
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
-
-# Production (po przygotowaniu deploy-config.production.json)
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.0 -Environment production
-```
-
-> **Nie używaj** przycisku Orchestrator „Upgrade to latest” — znany błąd API. Używaj skryptu deploy (patrz [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)).
-
 ## Zasoby UiPath (staging)
 
 | Zasób | ID / nazwa |
@@ -75,7 +70,7 @@ uip login --organization mzpocevylrxu --tenant DefaultTenant
 | Orchestrator release | `DPDDataInvestigator.agentic.Agentic.Process` |
 | Studio project | `28ac09c2-3a5c-4ba8-a78c-80883f38e6b5` |
 | Folder | `Shared/DPDCarInvestigator` |
-| Package / routing | `DPDCarInvestigator.AppV2.DPDAppMonitor` → `/dpdmonitoring/` |
+| Package / routing | `DPDCarInvestigator.AppV2.DPDAppMonitor` -> `/dpdmonitoring/` |
 
 ## Licencja
 
