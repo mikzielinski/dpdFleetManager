@@ -1,0 +1,18 @@
+{
+  "environment": "staging",
+  "portalHost": "staging.uipath.com",
+  "apiHost": "staging.api.uipath.com",
+  "appsHostSuffix": "staging.uipath.host",
+  "orgId": "c9ffe0f3-25c8-4539-a40f-1cb8e9248fd2",
+  "orgName": "mzpocevylrxu",
+  "tenantId": "545f9d31-8f94-4c22-9476-9f91417cc156",
+  "tenantName": "DefaultTenant",
+  "folderKey": "eea56026-1e4f-4d2d-81f3-b487bf2f795b",
+  "folderPath": "Shared/DPDCarInvestigator",
+  "packageId": "DPDCarInvestigator.AppV2.DPDAppMonitor",
+  "routingName": "dpdmonitoring",
+  "hostedBaseUrl": "https://mzpocevylrxu.staging.uipath.host/dpdmonitoring",
+  "studioProjectId": "28ac09c2-3a5c-4ba8-a78c-80883f38e6b5",
+  "oauthClientId": "98aa3ef7-06e0-431b-9997-1963d708bd45",
+  "identityClientId": "36dea5b8-e8bb-423d-8e7b-c808df8f1c00"
+}

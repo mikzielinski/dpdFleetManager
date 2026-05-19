@@ -1,0 +1,18 @@
+{
+  "environment": "production",
+  "portalHost": "cloud.uipath.com",
+  "apiHost": "cloud.uipath.com",
+  "appsHostSuffix": "uipath.host",
+  "orgId": "<PRODUCTION_ORG_GUID>",
+  "orgName": "<production-org-name>",
+  "tenantId": "<PRODUCTION_TENANT_GUID>",
+  "tenantName": "<ProductionTenantName>",
+  "folderKey": "<PRODUCTION_FOLDER_KEY>",
+  "folderPath": "Shared/DPDCarInvestigator",
+  "packageId": "DPDCarInvestigator.AppV2.DPDAppMonitor",
+  "routingName": "dpdmonitoring",
+  "hostedBaseUrl": "https://<production-org-name>.uipath.host/dpdmonitoring",
+  "studioProjectId": "<PRODUCTION_STUDIO_PROJECT_GUID>",
+  "oauthClientId": "<PRODUCTION_EXTERNAL_APP_CLIENT_ID>",
+  "identityClientId": "36dea5b8-e8bb-423d-8e7b-c808df8f1c00"
+}

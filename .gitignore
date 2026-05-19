@@ -1,0 +1,31 @@
+# Dependencies & build
+node_modules/
+dist/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# UiPath CLI auth (local machine only)
+.uipath/.auth
+
+# Generated packages & inspect artifacts
+.uipath/*.nupkg
+.uipath/cmp-*/
+.uipath/pkg-*/
+.uipath/verify/
+.uipath/nupkg-inspect/
+.uipath/*.zip
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Keep deploy configs and script
+!.uipath/deploy-config*.json
+!.uipath/deploy-dpdmonitoring.ps1

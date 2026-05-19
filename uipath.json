@@ -1,0 +1,8 @@
+{
+  "scope": "DataFabric.Schema.Read DataFabric.Data.Read PIMS OR.Execution OR.Jobs OR.Folders.Read",
+  "clientId": "98aa3ef7-06e0-431b-9997-1963d708bd45",
+  "orgName": "mzpocevylrxu",
+  "tenantName": "DefaultTenant",
+  "baseUrl": "https://staging.api.uipath.com",
+  "redirectUri": "https://mzpocevylrxu.staging.uipath.host/dpdmonitoring"
+}
