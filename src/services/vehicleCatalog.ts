@@ -30,6 +30,8 @@ export interface VehicleCatalogData {
   totalVehicles: number;
   /** Schema-derived POC → B2B vehicle relationship field names (for cost matching). */
   pocVehicleFieldNames: string[];
+  /** Region/firma uzupełnione z kosztów POC (brak relacji na B2B_Vehicles). */
+  labelsFromPoc?: boolean;
 }
 
 const REGISTRATION_FIELDS = [
@@ -102,6 +104,174 @@ const COMPANY_LABEL_FIELDS = [
   'LegalName',
   'TaxName',
 ] as const;
+
+const POC_COMPANY_FIELDS = [
+  'CompanyName',
+  'companyName',
+  'CourierCompanyName',
+  'FirmName',
+] as const;
+
+const POC_AREA_FIELDS = [
+  'Area',
+  'AreaName',
+  'City',
+  'Region',
+  'RegionName',
+  'CityName',
+  'Location',
+  'DPDArea',
+] as const;
+
+function normalizeHintKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function modeLabel(counts: Map<string, number>): string {
+  let best = '';
+  let max = 0;
+  for (const [label, n] of counts) {
+    if (n > max) {
+      max = n;
+      best = label;
+    }
+  }
+  return best;
+}
+
+type PocEnrichmentContext = {
+  companyRows: DpdRecord[];
+  companiesEntity: EntityGetResponse | null;
+  areasEntity: EntityGetResponse | null;
+  areaMap: Map<string, string>;
+  areaNames: string[];
+  companyNames: string[];
+};
+
+/** Firma kurierska (słownik B2B) → etykieta regionu, jeśli jest relacja na encji firmy. */
+function buildCompanyCatalogHints(ctx: PocEnrichmentContext): Map<string, { companyLabel: string; areaLabel: string }> {
+  const hints = new Map<string, { companyLabel: string; areaLabel: string }>();
+  const areaNames = ctx.areasEntity
+    ? [ctx.areasEntity.name, ctx.areasEntity.displayName, ...ctx.areaNames]
+    : ctx.areaNames;
+
+  for (const row of ctx.companyRows) {
+    const companyLabel = blankLabel(pickRecordLabel(row, COMPANY_LABEL_FIELDS));
+    if (!companyLabel) continue;
+    const areaLabel = blankLabel(
+      resolveRelationshipLabel(
+        row,
+        ctx.companiesEntity,
+        areaNames.filter(Boolean) as string[],
+        AREA_LABEL_FIELDS,
+        AREA_REF_FIELDS,
+        AREA_INLINE_FIELDS,
+        ctx.areaMap,
+      ),
+    );
+    hints.set(normalizeHintKey(companyLabel), { companyLabel, areaLabel });
+  }
+  return hints;
+}
+
+/** Najczęstsza firma / region z kosztów DPD_POC dla danej rejestracji. */
+function buildPocHintsByPlate(costs: DpdRecord[]): Map<
+  string,
+  { company: string; area: string }
+> {
+  const buckets = new Map<string, { companies: Map<string, number>; areas: Map<string, number> }>();
+
+  for (const row of costs) {
+    const reg = pickRecordLabel(row, ['CarRegistration', 'CarRegistraction', 'carRegistration']);
+    if (reg === '—' || !reg.trim()) continue;
+    const plateKey = normalizeRegistration(reg);
+    let bucket = buckets.get(plateKey);
+    if (!bucket) {
+      bucket = { companies: new Map(), areas: new Map() };
+      buckets.set(plateKey, bucket);
+    }
+    const co = pickRecordLabel(row, POC_COMPANY_FIELDS);
+    if (co !== '—' && co.trim()) {
+      const k = co.trim();
+      bucket.companies.set(k, (bucket.companies.get(k) ?? 0) + 1);
+    }
+    const ar = pickRecordLabel(row, POC_AREA_FIELDS);
+    if (ar !== '—' && ar.trim()) {
+      const k = ar.trim();
+      bucket.areas.set(k, (bucket.areas.get(k) ?? 0) + 1);
+    }
+  }
+
+  const out = new Map<string, { company: string; area: string }>();
+  for (const [plate, bucket] of buckets) {
+    out.set(plate, {
+      company: modeLabel(bucket.companies),
+      area: modeLabel(bucket.areas),
+    });
+  }
+  return out;
+}
+
+function resolveAreaFromCompanyName(
+  companyLabel: string,
+  catalogHints: Map<string, { companyLabel: string; areaLabel: string }>,
+): string {
+  if (!companyLabel.trim()) return '';
+  const key = normalizeHintKey(companyLabel);
+  if (catalogHints.has(key)) return catalogHints.get(key)!.areaLabel;
+  for (const [k, v] of catalogHints) {
+    if (k.includes(key) || key.includes(k)) return v.areaLabel;
+  }
+  return '';
+}
+
+/**
+ * Uzupełnia etykiety regionu/firmy z DPD_POC (po rejestracji) i słownika firm B2B,
+ * gdy encja pojazdów nie ma pól Relationship (staging).
+ */
+export function applyPocEnrichment(
+  catalog: VehicleCatalogData,
+  pocCosts: DpdRecord[],
+  ctx: PocEnrichmentContext,
+): VehicleCatalogData {
+  if (!pocCosts.length) return catalog;
+
+  const pocByPlate = buildPocHintsByPlate(pocCosts);
+  const companyCatalog = buildCompanyCatalogHints(ctx);
+
+  const vehicles = catalog.vehicles.map((v) => {
+    let companyLabel = v.companyLabel;
+    let areaLabel = v.areaLabel;
+    const plateKey = normalizeRegistration(v.registration);
+    const poc = pocByPlate.get(plateKey);
+
+    if (!companyLabel && poc?.company) {
+      companyLabel =
+        companyCatalog.get(normalizeHintKey(poc.company))?.companyLabel ?? poc.company;
+    }
+    if (!areaLabel && poc?.area) areaLabel = poc.area;
+    if (!areaLabel && companyLabel) {
+      areaLabel = resolveAreaFromCompanyName(companyLabel, companyCatalog);
+    }
+
+    return { ...v, companyLabel, areaLabel };
+  });
+
+  const areaOptions = [...new Set(vehicles.map((v) => v.areaLabel).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pl'),
+  );
+  const companyOptions = [...new Set(vehicles.map((v) => v.companyLabel).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pl'),
+  );
+
+  return {
+    ...catalog,
+    vehicles,
+    areaOptions,
+    companyOptions,
+    labelsFromPoc: true,
+  };
+}
 
 async function resolveEntityByNames(
   entities: Entities,
@@ -185,8 +355,11 @@ function summarizeRelationshipData(rows: DpdRecord[], fieldNames: string[]) {
   return { filled, empty, byField };
 }
 
-/** Load B2B vehicles with area / courier company labels via Data Fabric relationships. */
-export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogData> {
+/** Load B2B vehicles; opcjonalnie uzupełnij etykiety z DPD_POC (po rejestracji). */
+export async function loadVehicleCatalog(
+  sdk: UiPath,
+  pocCosts?: DpdRecord[],
+): Promise<VehicleCatalogData> {
   if (BYPASS_AUTH) {
     await Promise.resolve();
     return mockVehicleCatalog();
@@ -226,14 +399,14 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
       )
     : new Map<string, string>();
 
-  const companyMap = companiesEntity
-    ? buildLookupMap(
-        (await fetchAllEntityRecords(sdk, companiesEntity.id, { expansionLevel: 1 })).map((r) =>
-          normalizeDpdRecord(r),
-        ),
-        ['Id', 'id'],
-        COMPANY_LABEL_FIELDS,
+  const companyRows = companiesEntity
+    ? (await fetchAllEntityRecords(sdk, companiesEntity.id, { expansionLevel: 2 })).map((r) =>
+        normalizeDpdRecord(r),
       )
+    : [];
+
+  const companyMap = companyRows.length
+    ? buildLookupMap(companyRows, ['Id', 'id'], COMPANY_LABEL_FIELDS)
     : new Map<string, string>();
 
   const vehicleRows = (
@@ -309,13 +482,24 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
     });
   }
 
-  return {
+  const base: VehicleCatalogData = {
     vehicles: withPlate,
     areaOptions,
     companyOptions,
     totalVehicles: withPlate.length,
     pocVehicleFieldNames: schemaPocFields,
   };
+
+  if (!pocCosts?.length) return base;
+
+  return applyPocEnrichment(base, pocCosts, {
+    companyRows,
+    companiesEntity,
+    areasEntity,
+    areaMap,
+    areaNames: areaNames.filter(Boolean) as string[],
+    companyNames: companyNames.filter(Boolean) as string[],
+  });
 }
 
 export function filterVehicleCatalog(

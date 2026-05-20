@@ -203,8 +203,9 @@ export function GlobalFilterBar({
           </label>
 
           <p className="filter-hint">
-            Dane z encji Data Fabric: DPD_B2B_Vehicles, DPD_Areas_Wroclaw, DPD_B2B_Courier_Companies.
-            Koszty w panelu szczegółów pochodzą z DPD_POC (dopasowanie po numerze rejestracyjnym).
+            Pojazdy: DPD_B2B_Vehicles. Region i firma kurierska — z kosztów DPD_POC (najczęstsza wartość
+            dla rejestracji) oraz słownika DPD_B2B_Courier_Companies / DPD_Areas_Wroclaw, gdy brak relacji
+            na encji pojazdu.
           </p>
         </div>
       )}

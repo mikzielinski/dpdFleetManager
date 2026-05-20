@@ -256,13 +256,12 @@ export default function App() {
     setVehicleCatalogLoading(true);
     setVehicleCatalogError(null);
     try {
-      const [catalog, pocPage] = await Promise.all([
-        loadVehicleCatalog(sdk),
-        fetchAllDpdRecords(sdk),
-      ]);
+      const pocPage = await fetchAllDpdRecords(sdk);
       const maps = ctxRef.current?.choiceMaps ?? new Map();
+      const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
+      const catalog = await loadVehicleCatalog(sdk, pocItems);
       setVehicleCatalog(catalog);
-      setAllPocCosts(pocPage.items.map((r) => translateRecord(r, maps)));
+      setAllPocCosts(pocItems);
     } catch (e) {
       setVehicleCatalogError(e instanceof Error ? e.message : String(e));
       setVehicleCatalog(null);
