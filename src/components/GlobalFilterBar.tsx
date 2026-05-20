@@ -1,4 +1,5 @@
 import type { ClaimsFilterState } from '../utils/filterRecords';
+import type { VehicleFilterState } from '../utils/vehicleFilters';
 
 type MainSection = 'claims' | 'vehicles';
 
@@ -6,8 +7,10 @@ interface Props {
   section: MainSection;
   filters: ClaimsFilterState;
   onFiltersChange: (next: ClaimsFilterState) => void;
-  vehicleSearch: string;
-  onVehicleSearchChange: (v: string) => void;
+  vehicleFilters: VehicleFilterState;
+  onVehicleFiltersChange: (next: VehicleFilterState) => void;
+  areaOptions: string[];
+  vehicleCompanyOptions: string[];
   serviceOptions: string[];
   decisionOptions: string[];
   filteredCount: number;
@@ -22,8 +25,10 @@ export function GlobalFilterBar({
   section,
   filters,
   onFiltersChange,
-  vehicleSearch,
-  onVehicleSearchChange,
+  vehicleFilters,
+  onVehicleFiltersChange,
+  areaOptions,
+  vehicleCompanyOptions,
   serviceOptions,
   decisionOptions,
   filteredCount,
@@ -34,6 +39,13 @@ export function GlobalFilterBar({
 }: Props) {
   const patch = (partial: Partial<ClaimsFilterState>) =>
     onFiltersChange({ ...filters, ...partial });
+  const patchVehicle = (partial: Partial<VehicleFilterState>) =>
+    onVehicleFiltersChange({ ...vehicleFilters, ...partial });
+
+  const hasActiveVehicleFilters =
+    vehicleFilters.query.trim() !== '' ||
+    vehicleFilters.area !== '' ||
+    vehicleFilters.company !== '';
 
   const hasActiveClaimsFilters =
     filters.query.trim() !== '' ||
@@ -47,7 +59,7 @@ export function GlobalFilterBar({
     <div className="global-filter-bar" role="search" aria-label="Wyszukiwanie i filtry">
       <div className="global-filter-bar-head">
         <span className="global-filter-bar-title">Wyszukiwanie i filtry</span>
-        {(section === 'claims' ? hasActiveClaimsFilters : vehicleSearch.trim() !== '') && (
+        {(section === 'claims' ? hasActiveClaimsFilters : hasActiveVehicleFilters) && (
           <button type="button" className="btn btn-link-reset" onClick={onReset}>
             Wyczyść
           </button>
@@ -62,6 +74,11 @@ export function GlobalFilterBar({
                 <> z {datasetTotal} w bazie</>
               ) : null}
               )
+            </>
+          ) : section === 'vehicles' ? (
+            <>
+              {' '}
+              z <strong>{totalCount}</strong> pojazdów B2B
             </>
           ) : totalCount !== filteredCount ? (
             <>
@@ -149,14 +166,45 @@ export function GlobalFilterBar({
             <input
               type="search"
               autoComplete="off"
-              placeholder="Numer rejestracyjny…"
-              value={vehicleSearch}
-              onChange={(e) => onVehicleSearchChange(e.target.value)}
+              placeholder="Rejestracja, region, firma…"
+              value={vehicleFilters.query}
+              onChange={(e) => patchVehicle({ query: e.target.value })}
             />
           </label>
+
+          <label className="filter-field">
+            <span className="filter-label">Region / miasto</span>
+            <select
+              value={vehicleFilters.area}
+              onChange={(e) => patchVehicle({ area: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {areaOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="filter-field">
+            <span className="filter-label">Firma kurierska</span>
+            <select
+              value={vehicleFilters.company}
+              onChange={(e) => patchVehicle({ company: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {vehicleCompanyOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <p className="filter-hint">
-            Lista pojazdów jest budowana z rekordów widocznych na bieżącej stronie zgłoszeń (po odświeżeniu
-            zmień stronę, aby zobaczyć kolejne pojazdy).
+            Dane z encji Data Fabric: DPD_B2B_Vehicles, DPD_Areas_Wroclaw, DPD_B2B_Courier_Companies.
+            Koszty w panelu szczegółów pochodzą z DPD_POC (dopasowanie po numerze rejestracyjnym).
           </p>
         </div>
       )}

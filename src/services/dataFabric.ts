@@ -309,7 +309,7 @@ export async function fetchAllDpdRecords(sdk: UiPath): Promise<{
   return { items, totalCount: items.length };
 }
 
-async function fetchAllEntityRecords(sdk: UiPath, entityId: string): Promise<DpdRecord[]> {
+export async function fetchAllEntityRecords(sdk: UiPath, entityId: string): Promise<DpdRecord[]> {
   const entities = new Entities(sdk);
   const items: DpdRecord[] = [];
   let cursor: PaginationCursor | undefined;

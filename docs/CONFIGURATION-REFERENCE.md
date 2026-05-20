@@ -24,6 +24,9 @@ Plik: `.uipath/deploy-config.staging.json`
 |-------|-------|-----------|
 | Koszty / faktury | `DPD_POC_ENTITY_ID` | `4e2e38d9-bf4a-f111-8ef3-000d3a261acd` |
 | Flagi pojazdów | `DPD_VEHICLE_FLAGS_ENTITY_ID` | `8d83c3fe-c34a-f111-8ef3-000d3a261acd` |
+| Pojazdy B2B | `DATA_FABRIC_ENTITY_LOOKUP.b2bVehicles` | rozwiązywane runtime (`DPDB2BVehicles`) |
+| Regiony | `DATA_FABRIC_ENTITY_LOOKUP.areasWroclaw` | `DPDAreasWroclaw` |
+| Firmy kurierskie | `DATA_FABRIC_ENTITY_LOOKUP.b2bCourierCompanies` | `DPDB2BCourierCompanies` |
 
 > **Uwaga:** Nie używaj GUID pojedynczego **pola** jako ID encji.
 

@@ -452,6 +452,11 @@ tbody tr:hover {
   padding: 12px 14px;
 }
 
+.detail-grid-compact {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
 .detail-item dt {
   font-size: 11px;
   text-transform: uppercase;

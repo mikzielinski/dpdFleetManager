@@ -38,12 +38,20 @@ import { AnalysisResults } from './components/AnalysisResults';
 import { InvoicePreview } from './components/InvoicePreview';
 import { VehicleCaseHistory } from './components/VehicleCaseHistory';
 import {
+  filterVehicleCatalog,
+  loadVehicleCatalog,
+  matchCostsToVehicle,
+  type VehicleCatalogData,
+  type VehicleCatalogItem,
+} from './services/vehicleCatalog';
+import {
   findInvoiceFileField,
   normalizeRegistration,
   pickField,
   recordId,
   type DpdRecord,
 } from './utils/record';
+import { DEFAULT_VEHICLE_FILTERS, type VehicleFilterState } from './utils/vehicleFilters';
 
 export default function App() {
   const {
@@ -92,8 +100,12 @@ export default function App() {
 
   const [mainSection, setMainSection] = useState<'claims' | 'vehicles'>('claims');
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
-  const [vehicleSearch, setVehicleSearch] = useState('');
-  const [activeVehicleKey, setActiveVehicleKey] = useState<string | null>(null);
+  const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>(DEFAULT_VEHICLE_FILTERS);
+  const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogData | null>(null);
+  const [vehicleCatalogLoading, setVehicleCatalogLoading] = useState(false);
+  const [vehicleCatalogError, setVehicleCatalogError] = useState<string | null>(null);
+  const [allPocCosts, setAllPocCosts] = useState<DpdRecord[]>([]);
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
 
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
 
@@ -137,39 +149,31 @@ export default function App() {
     return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
   }, [records, tableColumns]);
 
-  const vehicleGroups = useMemo(() => {
-    const map = new Map<string, { key: string; plateLabel: string; items: DpdRecord[] }>();
-    for (const r of records) {
-      const label = pickField(r, 'carRegistration');
-      if (!label || label === '—') continue;
-      const key = normalizeRegistration(label);
-      let g = map.get(key);
-      if (!g) {
-        g = { key, plateLabel: label, items: [] };
-        map.set(key, g);
-      }
-      g.items.push(r);
+  const filteredVehicles = useMemo(() => {
+    if (!vehicleCatalog) return [];
+    return filterVehicleCatalog(vehicleCatalog.vehicles, vehicleFilters);
+  }, [vehicleCatalog, vehicleFilters]);
+
+  const pocCountByPlate = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of allPocCosts) {
+      const reg = pickField(r, 'carRegistration');
+      if (!reg || reg === '—') continue;
+      const key = normalizeRegistration(reg);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return [...map.values()].sort((a, b) => a.plateLabel.localeCompare(b.plateLabel, 'pl'));
-  }, [records]);
+    return counts;
+  }, [allPocCosts]);
 
-  const filteredVehicleGroups = useMemo(() => {
-    const raw = vehicleSearch.trim();
-    const compact = raw.replace(/\s+/g, '').toLowerCase();
-    if (!raw) return vehicleGroups;
-    return vehicleGroups.filter((g) => {
-      const plateNorm = normalizeRegistration(g.plateLabel).toLowerCase();
-      const plateLoose = g.plateLabel.toLowerCase();
-      return (
-        (compact.length > 0 && plateNorm.includes(compact)) || plateLoose.includes(raw.toLowerCase())
-      );
-    });
-  }, [vehicleGroups, vehicleSearch]);
+  const activeVehicle = useMemo((): VehicleCatalogItem | null => {
+    if (!activeVehicleId || !vehicleCatalog) return null;
+    return vehicleCatalog.vehicles.find((v) => v.id === activeVehicleId) ?? null;
+  }, [activeVehicleId, vehicleCatalog]);
 
-  const activeVehicleGroup = useMemo(() => {
-    if (!activeVehicleKey) return null;
-    return vehicleGroups.find((g) => g.key === activeVehicleKey) ?? null;
-  }, [activeVehicleKey, vehicleGroups]);
+  const activeVehicleCosts = useMemo(() => {
+    if (!activeVehicle) return [];
+    return matchCostsToVehicle(allPocCosts, activeVehicle.registration);
+  }, [activeVehicle, allPocCosts]);
 
   const activeRun = analysisRuns.find(
     (r) => r.status === 'running' || r.status === 'starting',
@@ -233,6 +237,37 @@ export default function App() {
   useEffect(() => {
     if (globalFilterActive) setPageIndex(0);
   }, [claimFilters, globalFilterActive]);
+
+  const loadVehicleTabData = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setVehicleCatalogLoading(true);
+    setVehicleCatalogError(null);
+    try {
+      const [catalog, pocPage] = await Promise.all([
+        loadVehicleCatalog(sdk),
+        fetchAllDpdRecords(sdk),
+      ]);
+      const maps = ctxRef.current?.choiceMaps ?? new Map();
+      setVehicleCatalog(catalog);
+      setAllPocCosts(pocPage.items.map((r) => translateRecord(r, maps)));
+    } catch (e) {
+      setVehicleCatalogError(e instanceof Error ? e.message : String(e));
+      setVehicleCatalog(null);
+      setAllPocCosts([]);
+    } finally {
+      setVehicleCatalogLoading(false);
+    }
+  }, [sdk, isAuthenticated]);
+
+  useEffect(() => {
+    if (mainSection !== 'vehicles' || !isAuthenticated) return;
+    if (vehicleCatalog || vehicleCatalogLoading) return;
+    void loadVehicleTabData();
+  }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
+
+  useEffect(() => {
+    if (mainSection === 'vehicles') setActiveVehicleId(null);
+  }, [vehicleFilters, mainSection]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -514,7 +549,7 @@ export default function App() {
           className={mainSection === 'vehicles' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
           onClick={() => {
             setMainSection('vehicles');
-            setActiveVehicleKey(null);
+            setActiveVehicleId(null);
           }}
         >
           Pojazdy
@@ -525,19 +560,25 @@ export default function App() {
         section={mainSection}
         filters={claimFilters}
         onFiltersChange={setClaimFilters}
-        vehicleSearch={vehicleSearch}
-        onVehicleSearchChange={setVehicleSearch}
+        vehicleFilters={vehicleFilters}
+        onVehicleFiltersChange={setVehicleFilters}
+        areaOptions={vehicleCatalog?.areaOptions ?? []}
+        vehicleCompanyOptions={vehicleCatalog?.companyOptions ?? []}
         serviceOptions={serviceOptions}
         decisionOptions={decisionOptions}
         filteredCount={
-          mainSection === 'claims' ? filteredRecords.length : filteredVehicleGroups.length
+          mainSection === 'claims' ? filteredRecords.length : filteredVehicles.length
         }
-        totalCount={mainSection === 'claims' ? records.length : vehicleGroups.length}
+        totalCount={
+          mainSection === 'claims'
+            ? records.length
+            : (vehicleCatalog?.totalVehicles ?? 0)
+        }
         globalFilterActive={mainSection === 'claims' && globalFilterActive}
         datasetTotal={recordTotal}
         onReset={() => {
           setClaimFilters(DEFAULT_CLAIMS_FILTERS);
-          setVehicleSearch('');
+          setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
         }}
       />
 
@@ -802,46 +843,62 @@ export default function App() {
           <div className="layout master-detail-layout">
             <section className="panel table-panel master-pane">
               <div className="panel-head">
-                <h2>Lista pojazdów</h2>
-                <span className="panel-head-meta">{vehicleGroups.length} pojazdów na tej stronie</span>
+                <h2>Lista pojazdów (DPD_B2B_Vehicles)</h2>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={vehicleCatalogLoading}
+                  onClick={() => {
+                    setVehicleCatalog(null);
+                    void loadVehicleTabData();
+                  }}
+                >
+                  Odśwież ({vehicleCatalog?.totalVehicles ?? '…'})
+                </button>
               </div>
+
+              {vehicleCatalogError && <p className="error-text">{vehicleCatalogError}</p>}
+
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Pojazd</th>
-                      <th>Zgłoszeń</th>
-                      <th className="col-numeric">Suma netto (strona)</th>
+                      <th>Region / miasto</th>
+                      <th>Firma kurierska</th>
+                      <th className="col-numeric">Zgłoszeń POC</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredVehicleGroups.length === 0 ? (
+                    {vehicleCatalogLoading ? (
                       <tr>
-                        <td colSpan={3} className="center">
-                          Brak pojazdów do wyświetlenia (sprawdź dane na bieżącej stronie zgłoszeń).
+                        <td colSpan={4} className="center">
+                          Ładowanie pojazdów i słowników regionów / firm…
+                        </td>
+                      </tr>
+                    ) : filteredVehicles.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="center">
+                          {vehicleCatalog
+                            ? 'Brak pojazdów spełniających filtry.'
+                            : 'Brak danych pojazdów.'}
                         </td>
                       </tr>
                     ) : (
-                      filteredVehicleGroups.map((g) => {
-                        const sumNet = g.items.reduce(
-                          (acc, r) => acc + (getRecordNumericAmount(r) ?? 0),
-                          0,
-                        );
-                        const selectedV = activeVehicleKey === g.key;
+                      filteredVehicles.map((v) => {
+                        const plateKey = normalizeRegistration(v.registration);
+                        const pocCount = pocCountByPlate.get(plateKey) ?? 0;
+                        const selectedV = activeVehicleId === v.id;
                         return (
                           <tr
-                            key={g.key}
+                            key={v.id}
                             className={selectedV ? 'row-active' : ''}
-                            onClick={() => setActiveVehicleKey(g.key)}
+                            onClick={() => setActiveVehicleId(v.id)}
                           >
-                            <td>{g.plateLabel}</td>
-                            <td>{g.items.length}</td>
-                            <td className="col-numeric">
-                              {sumNet.toLocaleString('pl-PL', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </td>
+                            <td>{v.registration}</td>
+                            <td>{v.areaLabel || '—'}</td>
+                            <td>{v.companyLabel || '—'}</td>
+                            <td className="col-numeric">{pocCount}</td>
                           </tr>
                         );
                       })
@@ -852,9 +909,10 @@ export default function App() {
             </section>
 
             <section className="panel detail-panel detail-pane">
-              {!activeVehicleGroup ? (
+              {!activeVehicle ? (
                 <p className="placeholder">
-                  Wybierz pojazd z listy po lewej, aby zobaczyć skrót kosztów i przejść do zgłoszeń.
+                  Wybierz pojazd z listy po lewej (B2B), aby zobaczyć region, firmę i powiązane koszty
+                  DPD_POC.
                 </p>
               ) : (
                 <>
@@ -862,11 +920,21 @@ export default function App() {
                     <h3 className="section-title">Podgląd pojazdu</h3>
                     <div className="meta-row">
                       <span className="meta-label">Rejestracja:</span>
-                      <span className="meta-value">{activeVehicleGroup.plateLabel}</span>
+                      <span className="meta-value">{activeVehicle.registration}</span>
                     </div>
+                    <dl className="detail-grid detail-grid-compact">
+                      <div className="detail-item">
+                        <dt>Region / miasto</dt>
+                        <dd>{activeVehicle.areaLabel || '—'}</dd>
+                      </div>
+                      <div className="detail-item">
+                        <dt>Firma kurierska</dt>
+                        <dd>{activeVehicle.companyLabel || '—'}</dd>
+                      </div>
+                    </dl>
                     <p className="hint-small">
-                      {activeVehicleGroup.items.length} pozycji kosztów na tej stronie · suma netto:{' '}
-                      {activeVehicleGroup.items
+                      {activeVehicleCosts.length} zgłoszeń DPD_POC · suma netto:{' '}
+                      {activeVehicleCosts
                         .reduce((acc, r) => acc + (getRecordNumericAmount(r) ?? 0), 0)
                         .toLocaleString('pl-PL', {
                           minimumFractionDigits: 2,
@@ -876,46 +944,54 @@ export default function App() {
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() => openVehicleInClaims(activeVehicleGroup.plateLabel)}
+                      onClick={() => openVehicleInClaims(activeVehicle.registration)}
                     >
                       Otwórz zgłoszenia dla tego pojazdu
                     </button>
                   </div>
 
-                  <h3 className="section-title">Koszty na bieżącej stronie</h3>
+                  <h3 className="section-title">Koszty DPD_POC (cała baza)</h3>
                   <div className="table-wrap table-wrap-nested">
                     <table>
                       <thead>
                         <tr>
                           <th>Usługa</th>
                           <th className="col-numeric">Kwota netto</th>
-                          <th>Decyzja</th>
+                          <th>Status</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {activeVehicleGroup.items.map((r, idx) => {
-                          const id = recordId(r);
-                          return (
-                            <tr
-                              key={id || `row-${idx}`}
-                              className={id === activeId ? 'row-active' : ''}
-                              onClick={() => {
-                                if (!id) return;
-                                setMainSection('claims');
-                                void selectRecord(id);
-                              }}
-                            >
-                              <td>{pickField(r, 'serviceName')}</td>
-                              <td className="col-numeric">{pickField(r, 'netPrice')}</td>
-                              <td>{pickField(r, 'decision')}</td>
-                            </tr>
-                          );
-                        })}
+                        {activeVehicleCosts.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="center">
+                              Brak kosztów POC dla tej rejestracji.
+                            </td>
+                          </tr>
+                        ) : (
+                          activeVehicleCosts.map((r, idx) => {
+                            const id = recordId(r);
+                            return (
+                              <tr
+                                key={id || `cost-${idx}`}
+                                className={id === activeId ? 'row-active' : ''}
+                                onClick={() => {
+                                  if (!id) return;
+                                  setMainSection('claims');
+                                  void selectRecord(id);
+                                }}
+                              >
+                                <td>{pickField(r, 'serviceName')}</td>
+                                <td className="col-numeric">{pickField(r, 'netPrice')}</td>
+                                <td>{pickField(r, 'decision')}</td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
                   <p className="hint-small">
-                    Kliknij wiersz, aby przejść do widoku zgłoszenia (master-detail) z fakturą i decyzją.
+                    Kliknij wiersz kosztu, aby otworzyć zgłoszenie z fakturą i decyzją managera.
                   </p>
                 </>
               )}

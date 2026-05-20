@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const version = process.argv[2] || '1.1.1';
+const version = process.argv[2] || '1.1.3';
 const envName = process.argv.includes('--production') ? 'production' : 'staging';
 
 const cfgPath = path.join(root, '.uipath', `deploy-config.${envName}.json`);

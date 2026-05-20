@@ -4,6 +4,16 @@ export const DPD_POC_ENTITY_ID = '4e2e38d9-bf4a-f111-8ef3-000d3a261acd';
 /** Data Fabric entity DPD_VehicleFlags — linked by registration / Vehicle ID */
 export const DPD_VEHICLE_FLAGS_ENTITY_ID = '8d83c3fe-c34a-f111-8ef3-000d3a261acd';
 
+/**
+ * Data Fabric entity names (resolved to UUID at runtime via entities.getAll()).
+ * Display names from portal may differ from API `name`.
+ */
+export const DATA_FABRIC_ENTITY_LOOKUP = {
+  b2bVehicles: ['DPDB2BVehicles', 'DPD_B2B_Vehicles'],
+  areasWroclaw: ['DPDAreasWroclaw', 'DPD_Areas_Wroclaw'],
+  b2bCourierCompanies: ['DPDB2BCourierCompanies', 'DPD_B2B_Courier_Companies'],
+} as const;
+
 /** Orchestrator release name (folder Shared/DPDDataInvestigator) */
 export const ORCHESTRATOR_RELEASE_NAME = 'DPDDataInvestigator.agentic.Agentic.Process';
 
