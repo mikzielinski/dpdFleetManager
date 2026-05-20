@@ -16,6 +16,7 @@ import {
   type EntityContext,
   type VehicleFlagHistoryItem,
 } from './services/dataFabric';
+import { CompaniesSection } from './components/CompaniesSection';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import {
   DEFAULT_CLAIMS_FILTERS,
@@ -38,6 +39,11 @@ import { AnalysisResults } from './components/AnalysisResults';
 import { InvoicePreview } from './components/InvoicePreview';
 import { VehicleCaseHistory } from './components/VehicleCaseHistory';
 import {
+  filterCompanyCatalog,
+  loadCompanyCatalog,
+  type CompanyCatalogData,
+} from './services/companyCatalog';
+import {
   buildPocCountByVehicleId,
   filterVehicleCatalog,
   loadVehicleCatalog,
@@ -45,6 +51,10 @@ import {
   type VehicleCatalogData,
   type VehicleCatalogItem,
 } from './services/vehicleCatalog';
+import {
+  DEFAULT_COMPANY_FILTERS,
+  type CompanyFilterState,
+} from './utils/companyFilters';
 import {
   findInvoiceFileField,
   normalizeRegistration,
@@ -99,7 +109,7 @@ export default function App() {
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
 
-  const [mainSection, setMainSection] = useState<'claims' | 'vehicles'>('claims');
+  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies'>('claims');
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
   const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>(DEFAULT_VEHICLE_FILTERS);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogData | null>(null);
@@ -107,6 +117,11 @@ export default function App() {
   const [vehicleCatalogError, setVehicleCatalogError] = useState<string | null>(null);
   const [allPocCosts, setAllPocCosts] = useState<DpdRecord[]>([]);
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
+  const [companyCatalog, setCompanyCatalog] = useState<CompanyCatalogData | null>(null);
+  const [companyCatalogLoading, setCompanyCatalogLoading] = useState(false);
+  const [companyCatalogError, setCompanyCatalogError] = useState<string | null>(null);
+  const [companyFilters, setCompanyFilters] = useState<CompanyFilterState>(DEFAULT_COMPANY_FILTERS);
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
 
@@ -154,6 +169,11 @@ export default function App() {
     if (!vehicleCatalog) return [];
     return filterVehicleCatalog(vehicleCatalog.vehicles, vehicleFilters);
   }, [vehicleCatalog, vehicleFilters]);
+
+  const filteredCompanies = useMemo(() => {
+    if (!companyCatalog) return [];
+    return filterCompanyCatalog(companyCatalog.companies, companyFilters);
+  }, [companyCatalog, companyFilters]);
 
   const vehicleIdsByPlate = useMemo(() => {
     const map = new Map<string, string>();
@@ -282,6 +302,41 @@ export default function App() {
   }, [vehicleFilters, mainSection]);
 
   useEffect(() => {
+    if (mainSection === 'companies') setActiveCompanyId(null);
+  }, [companyFilters, mainSection]);
+
+  const loadCompanyTabData = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setCompanyCatalogLoading(true);
+    setCompanyCatalogError(null);
+    try {
+      let fleet = vehicleCatalog?.vehicles ?? [];
+      if (!vehicleCatalog) {
+        const pocPage = await fetchAllDpdRecords(sdk);
+        const maps = ctxRef.current?.choiceMaps ?? new Map();
+        const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
+        const cat = await loadVehicleCatalog(sdk, pocItems);
+        setVehicleCatalog(cat);
+        setAllPocCosts(pocItems);
+        fleet = cat.vehicles;
+      }
+      const companies = await loadCompanyCatalog(sdk, fleet);
+      setCompanyCatalog(companies);
+    } catch (e) {
+      setCompanyCatalogError(e instanceof Error ? e.message : String(e));
+      setCompanyCatalog(null);
+    } finally {
+      setCompanyCatalogLoading(false);
+    }
+  }, [sdk, isAuthenticated, vehicleCatalog]);
+
+  useEffect(() => {
+    if (mainSection !== 'companies' || !isAuthenticated) return;
+    if (companyCatalog || companyCatalogLoading) return;
+    void loadCompanyTabData();
+  }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
@@ -379,6 +434,16 @@ export default function App() {
       else pageIds.forEach((id) => next.add(id));
       return next;
     });
+  };
+
+  const openVehicleInFleet = (registration: string) => {
+    setMainSection('vehicles');
+    setVehicleFilters({ ...DEFAULT_VEHICLE_FILTERS, query: registration });
+    setActiveVehicleId(null);
+    const v = vehicleCatalog?.vehicles.find(
+      (x) => normalizeRegistration(x.registration) === normalizeRegistration(registration),
+    );
+    if (v) setActiveVehicleId(v.id);
   };
 
   const openVehicleInClaims = (plateQuery: string) => {
@@ -554,7 +619,7 @@ export default function App() {
           className={mainSection === 'claims' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
           onClick={() => setMainSection('claims')}
         >
-          Zgłoszenia DPD_POC
+          Rejestr Rozliczeń
         </button>
         <button
           type="button"
@@ -566,6 +631,16 @@ export default function App() {
         >
           Pojazdy
         </button>
+        <button
+          type="button"
+          className={mainSection === 'companies' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => {
+            setMainSection('companies');
+            setActiveCompanyId(null);
+          }}
+        >
+          Firma
+        </button>
       </nav>
 
       <GlobalFilterBar
@@ -574,23 +649,33 @@ export default function App() {
         onFiltersChange={setClaimFilters}
         vehicleFilters={vehicleFilters}
         onVehicleFiltersChange={setVehicleFilters}
+        companyFilters={companyFilters}
+        onCompanyFiltersChange={setCompanyFilters}
         areaOptions={vehicleCatalog?.areaOptions ?? []}
+        companyAreaOptions={companyCatalog?.areaOptions ?? []}
         vehicleCompanyOptions={vehicleCatalog?.companyOptions ?? []}
         serviceOptions={serviceOptions}
         decisionOptions={decisionOptions}
         filteredCount={
-          mainSection === 'claims' ? filteredRecords.length : filteredVehicles.length
+          mainSection === 'claims'
+            ? filteredRecords.length
+            : mainSection === 'vehicles'
+              ? filteredVehicles.length
+              : filteredCompanies.length
         }
         totalCount={
           mainSection === 'claims'
             ? records.length
-            : (vehicleCatalog?.totalVehicles ?? 0)
+            : mainSection === 'vehicles'
+              ? (vehicleCatalog?.totalVehicles ?? 0)
+              : (companyCatalog?.totalCompanies ?? 0)
         }
         globalFilterActive={mainSection === 'claims' && globalFilterActive}
         datasetTotal={recordTotal}
         onReset={() => {
           setClaimFilters(DEFAULT_CLAIMS_FILTERS);
           setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
+          setCompanyFilters(DEFAULT_COMPANY_FILTERS);
         }}
       />
 
@@ -617,7 +702,7 @@ export default function App() {
           <div className="layout master-detail-layout">
             <section className="panel table-panel master-pane">
               <div className="panel-head">
-                <h2>Zgłoszenia DPD_POC</h2>
+                <h2>Rejestr Rozliczeń</h2>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -625,7 +710,7 @@ export default function App() {
                     void (globalFilterActive ? loadAllForFilters() : loadPage(undefined, true))
                   }
                 >
-                  Odśwież zgłoszenia ({recordTotal ?? records.length})
+                  Odśwież ({recordTotal ?? records.length})
                 </button>
               </div>
 
@@ -851,7 +936,7 @@ export default function App() {
               )}
             </section>
           </div>
-        ) : (
+        ) : mainSection === 'vehicles' ? (
           <div className="layout master-detail-layout">
             <section className="panel table-panel master-pane">
               <div className="panel-head">
@@ -957,7 +1042,7 @@ export default function App() {
                       className="btn btn-primary"
                       onClick={() => openVehicleInClaims(activeVehicle.registration)}
                     >
-                      Otwórz zgłoszenia dla tego pojazdu
+                      Otwórz rejestr rozliczeń dla tego pojazdu
                     </button>
                   </div>
 
@@ -1008,6 +1093,21 @@ export default function App() {
               )}
             </section>
           </div>
+        ) : (
+          <CompaniesSection
+            catalog={companyCatalog}
+            loading={companyCatalogLoading}
+            error={companyCatalogError}
+            filtered={filteredCompanies}
+            fleetVehicles={vehicleCatalog?.vehicles ?? []}
+            activeCompanyId={activeCompanyId}
+            onSelectCompany={setActiveCompanyId}
+            onRefresh={() => {
+              setCompanyCatalog(null);
+              void loadCompanyTabData();
+            }}
+            onOpenVehicle={openVehicleInFleet}
+          />
         )}
       </div>
     </div>

@@ -1,7 +1,8 @@
+import type { CompanyFilterState } from '../utils/companyFilters';
 import type { ClaimsFilterState } from '../utils/filterRecords';
 import type { VehicleFilterState } from '../utils/vehicleFilters';
 
-type MainSection = 'claims' | 'vehicles';
+type MainSection = 'claims' | 'vehicles' | 'companies';
 
 interface Props {
   section: MainSection;
@@ -9,7 +10,10 @@ interface Props {
   onFiltersChange: (next: ClaimsFilterState) => void;
   vehicleFilters: VehicleFilterState;
   onVehicleFiltersChange: (next: VehicleFilterState) => void;
+  companyFilters: CompanyFilterState;
+  onCompanyFiltersChange: (next: CompanyFilterState) => void;
   areaOptions: string[];
+  companyAreaOptions: string[];
   vehicleCompanyOptions: string[];
   serviceOptions: string[];
   decisionOptions: string[];
@@ -27,7 +31,10 @@ export function GlobalFilterBar({
   onFiltersChange,
   vehicleFilters,
   onVehicleFiltersChange,
+  companyFilters,
+  onCompanyFiltersChange,
   areaOptions,
+  companyAreaOptions,
   vehicleCompanyOptions,
   serviceOptions,
   decisionOptions,
@@ -41,6 +48,11 @@ export function GlobalFilterBar({
     onFiltersChange({ ...filters, ...partial });
   const patchVehicle = (partial: Partial<VehicleFilterState>) =>
     onVehicleFiltersChange({ ...vehicleFilters, ...partial });
+  const patchCompany = (partial: Partial<CompanyFilterState>) =>
+    onCompanyFiltersChange({ ...companyFilters, ...partial });
+
+  const hasActiveCompanyFilters =
+    companyFilters.query.trim() !== '' || companyFilters.area !== '';
 
   const hasActiveVehicleFilters =
     vehicleFilters.query.trim() !== '' ||
@@ -59,7 +71,11 @@ export function GlobalFilterBar({
     <div className="global-filter-bar" role="search" aria-label="Wyszukiwanie i filtry">
       <div className="global-filter-bar-head">
         <span className="global-filter-bar-title">Wyszukiwanie i filtry</span>
-        {(section === 'claims' ? hasActiveClaimsFilters : hasActiveVehicleFilters) && (
+        {(section === 'claims'
+          ? hasActiveClaimsFilters
+          : section === 'vehicles'
+            ? hasActiveVehicleFilters
+            : hasActiveCompanyFilters) && (
           <button type="button" className="btn btn-link-reset" onClick={onReset}>
             Wyczyść
           </button>
@@ -80,6 +96,11 @@ export function GlobalFilterBar({
               {' '}
               z <strong>{totalCount}</strong> pojazdów B2B
             </>
+          ) : section === 'companies' ? (
+            <>
+              {' '}
+              z <strong>{totalCount}</strong> firm B2B
+            </>
           ) : totalCount !== filteredCount ? (
             <>
               {' '}
@@ -91,7 +112,40 @@ export function GlobalFilterBar({
         </span>
       </div>
 
-      {section === 'claims' ? (
+      {section === 'companies' ? (
+        <div className="global-filter-controls">
+          <label className="filter-field filter-grow">
+            <span className="filter-label">Szukaj firmy</span>
+            <input
+              type="search"
+              autoComplete="off"
+              placeholder="Nazwa firmy, region…"
+              value={companyFilters.query}
+              onChange={(e) => patchCompany({ query: e.target.value })}
+            />
+          </label>
+
+          <label className="filter-field">
+            <span className="filter-label">Region / miasto</span>
+            <select
+              value={companyFilters.area}
+              onChange={(e) => patchCompany({ area: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {companyAreaOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="filter-hint">
+            Słownik DPD_B2B_Courier_Companies. Kolumna „Pojazdy” — liczba pojazdów floty przypisanych do
+            firmy w katalogu B2B.
+          </p>
+        </div>
+      ) : section === 'claims' ? (
         <div className="global-filter-controls">
           <label className="filter-field filter-grow">
             <span className="filter-label">Szukaj</span>
@@ -159,7 +213,7 @@ export function GlobalFilterBar({
             <span>Tylko z oznaczeniem / anomalią</span>
           </label>
         </div>
-      ) : (
+      ) : section === 'vehicles' ? (
         <div className="global-filter-controls">
           <label className="filter-field filter-grow">
             <span className="filter-label">Szukaj pojazdu</span>
@@ -207,7 +261,7 @@ export function GlobalFilterBar({
             powiązania, przypisany jest fikcyjny partner B2B DPD (nie nazwa ze stacji paliw / faktury).
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
