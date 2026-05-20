@@ -33,7 +33,7 @@ npm run preview  # podgląd buildu lokalnie
 uip login --organization mzpocevylrxu --tenant DefaultTenant
 
 # Staging (domyślnie)
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
+.\.uipath\deploy-dpdmonitoring.ps1 1.1.0
 
 # Production (po przygotowaniu deploy-config.production.json)
 .\.uipath\deploy-dpdmonitoring.ps1 1.0.0 -Environment production

@@ -1,7 +1,7 @@
 # Deploy DPD Fleet Manager to dpdmonitoring (Coded Web App)
 # Usage: .\.uipath\deploy-dpdmonitoring.ps1 [version] [-Environment staging|production]
 param(
-  [string]$Version = "1.0.8",
+  [string]$Version = "1.1.0",
   [ValidateSet('staging', 'production')]
   [string]$Environment = 'staging'
 )

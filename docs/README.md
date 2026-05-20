@@ -24,7 +24,7 @@ copy .env.example .env
 npm install
 uip login --organization mzpocevylrxu --tenant DefaultTenant
 npm run build
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
+.\.uipath\deploy-dpdmonitoring.ps1 1.1.0
 ```
 
 Aplikacja: https://mzpocevylrxu.staging.uipath.host/dpdmonitoring/

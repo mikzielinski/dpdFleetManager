@@ -10,9 +10,9 @@ Jeden skrypt wykonuje całość:
 
 ```powershell
 cd dpdFleetManager
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.8
+.\.uipath\deploy-dpdmonitoring.ps1 1.1.0
 # opcjonalnie jawnie:
-.\.uipath\deploy-dpdmonitoring.ps1 1.0.9 -Environment staging
+.\.uipath\deploy-dpdmonitoring.ps1 1.1.0 -Environment staging
 ```
 
 Konfiguracja staging: `.uipath/deploy-config.staging.json`
@@ -79,4 +79,4 @@ Gdzie `version` = **`deployVersion`** z odpowiedzi publish, **nie** `semVersion`
 - **semVersion** — semver w `nupkg` (np. `1.0.8`)
 - **deployVersion** — liczba całkowita przypisana przez platformę przy publish (np. `8`)
 
-Zawsze podawaj nowy semver przy kolejnym release: `.\.uipath\deploy-dpdmonitoring.ps1 1.0.9`
+Zawsze podawaj nowy semver przy kolejnym release: `.\.uipath\deploy-dpdmonitoring.ps1 1.2.0` (przykład)
