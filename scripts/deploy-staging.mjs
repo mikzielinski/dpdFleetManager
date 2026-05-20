@@ -1,7 +1,7 @@
 /**
  * Staging deploy (Node) — mirrors .uipath/deploy-dpdmonitoring.ps1
  * Requires: uip login --authority https://staging.uipath.com/identity_ ...
- * Usage: node scripts/deploy-staging.mjs [semver]  (default 1.1.0)
+ * Usage: node scripts/deploy-staging.mjs [semver]  (default 1.1.1)
  */
 import { execSync } from 'child_process';
 import fs from 'fs';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const version = process.argv[2] || '1.1.0';
+const version = process.argv[2] || '1.1.1';
 const envName = process.argv.includes('--production') ? 'production' : 'staging';
 
 const cfgPath = path.join(root, '.uipath', `deploy-config.${envName}.json`);
@@ -126,15 +126,34 @@ async function main() {
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
+  let uploadSkipped = false;
   if (!up.ok) {
     const t = await up.text();
     if (!/already exists/i.test(t)) throw new Error(`Upload failed: ${up.status} ${t}`);
-    console.log('Package already in feed');
+    uploadSkipped = true;
+    console.warn(
+      'Package already in feed — feed may still hold the previous build. Use a new semver (e.g. 1.1.1) when dist/ changed.',
+    );
   } else {
     console.log('Upload OK');
   }
 
+  const searchUrl = `${appsBase}/tenants/${cfg.tenantId}/publish/apps?searchText=${encodeURIComponent(pkgId)}&folderFeedType=tenant&origin=uip&command=codedapp`;
+
+  async function loadPublishFeed() {
+    return (await (await fetch(searchUrl, { headers: apiHeaders(token) })).json()).value || [];
+  }
+
+  function findPublishedBySemver(items, semVersion) {
+    return items.find(
+      (a) =>
+        a.title === pkgId &&
+        (a.semVersion === semVersion || a.packageVersion === semVersion || a.version === semVersion),
+    );
+  }
+
   console.log('==> Publish coded app');
+  let deployVersion;
   const pub = await fetch(`${appsBase}/apps/codedapp/publish?origin=uip&command=codedapp`, {
     method: 'POST',
     headers: apiHeaders(token),
@@ -146,15 +165,34 @@ async function main() {
       schema: {},
     }),
   });
-  if (!pub.ok) throw new Error(`Publish failed: ${pub.status} ${await pub.text()}`);
-  const pubJson = await pub.json();
-  const deployVersion = pubJson.deployVersion;
-  console.log(`Published deployVersion=${deployVersion}`);
+  if (pub.ok) {
+    const pubJson = await pub.json();
+    deployVersion = pubJson.deployVersion;
+    console.log(`Published deployVersion=${deployVersion}`);
+  } else {
+    const errText = await pub.text();
+    if (pub.status === 400 && /already exists/i.test(errText)) {
+      if (uploadSkipped) {
+        throw new Error(
+          `Publish skipped: version ${version} already published and package was not re-uploaded. Deploy a new semver, e.g.: node scripts/deploy-staging.mjs 1.1.1`,
+        );
+      }
+      const existing = findPublishedBySemver(await loadPublishFeed(), version);
+      if (!existing?.deployVersion) {
+        throw new Error(`Publish failed (already exists) but could not find ${version} in feed: ${errText}`);
+      }
+      deployVersion = existing.deployVersion;
+      console.warn(
+        `Version ${version} already published — reusing deployVersion=${deployVersion} for upgrade only.`,
+      );
+    } else {
+      throw new Error(`Publish failed: ${pub.status} ${errText}`);
+    }
+  }
 
   console.log(`==> Deploy / upgrade (${cfg.routingName})`);
-  const searchUrl = `${appsBase}/tenants/${cfg.tenantId}/publish/apps?searchText=${encodeURIComponent(pkgId)}&folderFeedType=tenant&origin=uip&command=codedapp`;
-  const feed = await (await fetch(searchUrl, { headers: apiHeaders(token) })).json();
-  const published = (feed.value || []).find(
+  const feed = await loadPublishFeed();
+  const published = (feed || []).find(
     (a) => a.title === pkgId && a.deployVersion === deployVersion,
   );
   if (!published?.systemName) throw new Error('Published app not found in feed');
