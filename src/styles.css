@@ -299,6 +299,22 @@ body {
   margin-bottom: 12px;
 }
 
+.fuel-kpi-highlight dd strong {
+  color: #e85d04;
+  font-size: 1.05em;
+}
+
+.fuel-consumption-hint {
+  margin-top: -4px;
+  margin-bottom: 10px;
+}
+
+.stats-kpi-inline {
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: #444;
+}
+
 .hint-ok {
   color: #2a9d8f;
 }

@@ -1,4 +1,5 @@
 import { categorizeService } from '../utils/serviceCategories';
+import { computeFuelConsumption, fuelLitersFromRecord } from '../utils/fuelConsumption';
 import { getRecordNumericAmount } from '../utils/filterRecords';
 import type { DpdRecord } from '../utils/record';
 import { normalizeRegistration, pickField } from '../utils/record';
@@ -16,6 +17,8 @@ export interface RegionFuelRow {
   drivenKm: number;
   fuelCostPerKm: number | null;
   avgFuelCostPerVehicle: number;
+  fuelLitersPer100Km: number | null;
+  kmPerLiter: number | null;
 }
 
 export interface VehicleFuelPeriodStats {
@@ -24,30 +27,20 @@ export interface VehicleFuelPeriodStats {
   fuelCount: number;
   drivenKm: number | null;
   fuelCostPerKm: number | null;
+  fuelLitersPer100Km: number | null;
+  kmPerLiter: number | null;
+  plnPerLiter: number | null;
   region: string;
   regionAvgFuelCostPerKm: number | null;
-  vsRegionPct: number | null;
+  regionAvgLitersPer100Km: number | null;
+  vsRegionCostPct: number | null;
+  vsRegionConsumptionPct: number | null;
 }
 
 function isFuelRecord(r: DpdRecord): boolean {
   const svc = pickField(r, 'serviceName', 'ServiceName');
   const st = pickField(r, 'serviceType', 'ServiceType');
   return categorizeService(svc === '—' ? '' : svc, st === '—' ? '' : st) === 'Paliwo';
-}
-
-function fuelLitersFromRecord(r: DpdRecord): number {
-  const amt = getRecordNumericAmount(r);
-  const qty = parseNumLoose(pickField(r, 'amount', 'Amount'));
-  if (qty != null && qty > 0 && qty < 500) return qty;
-  if (amt != null && amt > 0 && amt < 80) return Math.round(amt * 10) / 10;
-  return 0;
-}
-
-function parseNumLoose(s: string): number | null {
-  const t = s.trim().replace(/\s/g, '').replace(',', '.');
-  if (!t) return null;
-  const n = Number.parseFloat(t);
-  return Number.isFinite(n) ? n : null;
 }
 
 function plateToRegion(
@@ -123,6 +116,7 @@ export function aggregateFuelByRegion(
   for (const [region, v] of byRegion) {
     if (v.fuelCount === 0 && v.drivenKm === 0) continue;
     const vehicleCount = v.plates.size;
+    const consumption = computeFuelConsumption(v.fuelLiters, v.drivenKm, v.fuelCost);
     rows.push({
       region,
       fuelCost: v.fuelCost,
@@ -132,6 +126,8 @@ export function aggregateFuelByRegion(
       drivenKm: v.drivenKm,
       fuelCostPerKm: v.drivenKm > 0 ? v.fuelCost / v.drivenKm : null,
       avgFuelCostPerVehicle: vehicleCount > 0 ? v.fuelCost / vehicleCount : 0,
+      fuelLitersPer100Km: consumption.litersPer100Km,
+      kmPerLiter: consumption.kmPerLiter,
     });
   }
 
@@ -165,12 +161,26 @@ export function statsForVehicleFuelPeriod(
   );
   const region = vehicle.areaLabel?.trim() || 'Nieprzypisany';
   const regionRow = regionRows.find((x) => x.region === region);
-  const regionAvg = regionRow?.fuelCostPerKm ?? null;
+  const regionAvgCost = regionRow?.fuelCostPerKm ?? null;
+  const regionAvgL100 = regionRow?.fuelLitersPer100Km ?? null;
   const fuelCostPerKm =
     drivenKm != null && drivenKm > 0 ? fuelCost / drivenKm : null;
-  let vsRegionPct: number | null = null;
-  if (fuelCostPerKm != null && regionAvg != null && regionAvg > 0) {
-    vsRegionPct = Math.round(((fuelCostPerKm - regionAvg) / regionAvg) * 100);
+  const consumption = computeFuelConsumption(fuelLiters, drivenKm, fuelCost);
+
+  let vsRegionCostPct: number | null = null;
+  if (fuelCostPerKm != null && regionAvgCost != null && regionAvgCost > 0) {
+    vsRegionCostPct = Math.round(((fuelCostPerKm - regionAvgCost) / regionAvgCost) * 100);
+  }
+
+  let vsRegionConsumptionPct: number | null = null;
+  if (
+    consumption.litersPer100Km != null &&
+    regionAvgL100 != null &&
+    regionAvgL100 > 0
+  ) {
+    vsRegionConsumptionPct = Math.round(
+      ((consumption.litersPer100Km - regionAvgL100) / regionAvgL100) * 100,
+    );
   }
 
   return {
@@ -179,8 +189,13 @@ export function statsForVehicleFuelPeriod(
     fuelCount,
     drivenKm,
     fuelCostPerKm,
+    fuelLitersPer100Km: consumption.litersPer100Km,
+    kmPerLiter: consumption.kmPerLiter,
+    plnPerLiter: consumption.plnPerLiter,
     region,
-    regionAvgFuelCostPerKm: regionAvg,
-    vsRegionPct,
+    regionAvgFuelCostPerKm: regionAvgCost,
+    regionAvgLitersPer100Km: regionAvgL100,
+    vsRegionCostPct,
+    vsRegionConsumptionPct,
   };
 }
