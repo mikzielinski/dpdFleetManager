@@ -19,7 +19,7 @@ Konfiguracja staging: `.uipath/deploy-config.staging.json`
 
 ## Wymagania wstępne
 
-1. `uip login` na staging (`mzpocevylrxu` / `DefaultTenant`)
+1. `npm run login:staging` (lub `uip login` **z** `--authority https://staging.uipath.com/identity_`)
 2. Plik `%USERPROFILE%\.uipath\.auth` z ważnym tokenem (skrypt odświeża przy wygaśnięciu)
 3. Uprawnienia: upload pakietu, publish coded app, deploy w folderze `Shared/DPDCarInvestigator`
 4. `.env` z poprawnym `VITE_UIPATH_CLIENT_ID` przed `npm run build`

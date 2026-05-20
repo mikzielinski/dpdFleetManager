@@ -4,37 +4,21 @@
  *
  * node scripts/diagnose-fabric-fields.mjs
  */
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  loadStagingDeployConfig,
+  REPO_ROOT,
+  requireStagingAuth,
+} from './uipath-staging-auth.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '..');
-const cfg = JSON.parse(
-  fs.readFileSync(path.join(root, '.uipath', 'deploy-config.staging.json'), 'utf8'),
-);
-const authFile = path.join(os.homedir(), '.uipath', '.auth');
+const root = REPO_ROOT;
+const cfg = loadStagingDeployConfig(root);
 const POC_ENTITY_ID = '4e2e38d9-bf4a-f111-8ef3-000d3a261acd';
 
 const ENTITY_NAMES = {
   vehicles: ['DPDB2BVehicles', 'DPD_B2B_Vehicles'],
   poc: ['DPDPOC', 'DPD_POC'],
 };
-
-function parseAuth(file) {
-  const map = Object.fromEntries(
-    fs
-      .readFileSync(file, 'utf8')
-      .split(/\r?\n/)
-      .filter((l) => l.includes('='))
-      .map((l) => {
-        const i = l.indexOf('=');
-        return [l.slice(0, i), l.slice(i + 1)];
-      }),
-  );
-  return map.UIPATH_ACCESS_TOKEN;
-}
 
 const apiRoot = `https://${cfg.apiHost}/${cfg.orgName}/${cfg.tenantName}/`;
 
@@ -93,11 +77,8 @@ function listSchemaFields(meta, pattern) {
 }
 
 async function main() {
-  if (!fs.existsSync(authFile)) {
-    console.error(`Brak ${authFile} — uip login (staging).`);
-    process.exit(1);
-  }
-  const token = parseAuth(authFile);
+  const { accessToken: token } = requireStagingAuth(cfg);
+  console.log(`API: ${apiRoot}datafabric_/api/Entity\n`);
   const all = await apiGet(token, '/datafabric_/api/Entity');
   const vehiclesMeta = resolveEntity(all, ENTITY_NAMES.vehicles);
   const pocMeta =

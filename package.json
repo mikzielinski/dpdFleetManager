@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy:staging": "node scripts/deploy-staging.mjs 1.2.3"
+    "login:staging": "node scripts/run-uip-login-staging.mjs",
+    "deploy:staging": "node scripts/deploy-staging.mjs 1.2.3",
+    "diagnose:fabric": "node scripts/diagnose-fabric-fields.mjs",
+    "diagnose:links": "node scripts/diagnose-vehicle-links.mjs"
   },
   "dependencies": {
     "@uipath/uipath-typescript": "^1.3.8",

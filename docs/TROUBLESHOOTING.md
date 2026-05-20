@@ -65,12 +65,33 @@ Szczegóły: **[OAUTH-AND-REDIRECT.md](OAUTH-AND-REDIRECT.md)** (sekcje 3–4 i 
 
 W encji **DPD_VehicleFlags** pole **Vehicle ID** musi odpowiadać numerowi rejestracyjnemu rekordu (np. `WA 622 AV`).
 
+## `uip login` otwiera cloud zamiast staging
+
+**Objaw:** przeglądarka idzie na `https://cloud.uipath.com`, diagnostyka zwraca HTML zamiast JSON, deploy trafia w złą organizację.
+
+**Przyczyna:** samo `uip login --organization mzpocevylrxu --tenant DefaultTenant` **nie** wystarczy — domyślnie to **production**.
+
+**Naprawa:**
+
+```powershell
+npm run login:staging
+```
+
+Lub:
+
+```powershell
+uip logout
+uip login --organization mzpocevylrxu --tenant DefaultTenant --authority https://staging.uipath.com/identity_
+```
+
+Portal staging: https://staging.uipath.com/mzpocevylrxu/
+
 ## Token wygasł podczas deploy
 
 Skrypt odświeża token z `%USERPROFILE%\.uipath\.auth`. Jeśli refresh się nie udaje:
 
 ```powershell
-uip login --organization <org> --tenant <tenant>
+npm run login:staging
 ```
 
 ## `uip codedapp deploy` — „App has not been published”
