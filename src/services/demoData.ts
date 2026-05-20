@@ -3,6 +3,7 @@ import type { PaginationCursor } from '@uipath/uipath-typescript/core';
 import { DPD_POC_ENTITY_ID, TABLE_COLUMNS } from '../config';
 import { appendDemoPocBoost, type PocBoostVehicle } from '../data/demoStagingPoc';
 import type { DpdRecord } from '../utils/record';
+import { pickField } from '../utils/record';
 export const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true';
 
 /** Pojazdy zgodne z mockVehicleCatalog — do boost POC w trybie BYPASS. */
@@ -259,8 +260,18 @@ const MOCK_RECORDS: DpdRecord[] = [
   },
 ];
 
+function withSpreadDates(records: DpdRecord[]): DpdRecord[] {
+  const now = Date.now();
+  return records.map((r, i) => {
+    if (pickField(r, 'date') !== '—') return r;
+    const d = new Date(now - (i + 1) * 86_400_000 * 3);
+    const iso = d.toISOString().slice(0, 10);
+    return { ...r, Date: iso, ServiceDate: iso, date: iso };
+  });
+}
+
 export function getAllMockRecords(): DpdRecord[] {
-  const base = MOCK_RECORDS.map((r) => ({ ...r }));
+  const base = withSpreadDates(MOCK_RECORDS.map((r) => ({ ...r })));
   return appendDemoPocBoost(BYPASS_DEMO_VEHICLES, base);
 }
 

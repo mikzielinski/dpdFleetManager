@@ -1,6 +1,8 @@
 import type { CompanyFilterState } from '../utils/companyFilters';
 import type { ClaimsFilterState } from '../utils/filterRecords';
 import type { VehicleFilterState } from '../utils/vehicleFilters';
+import { PeriodFilterRow } from './PeriodFilterRow';
+import { isPeriodFilterActive, type PeriodFilterState } from '../utils/periodFilter';
 
 type MainSection = 'claims' | 'vehicles' | 'companies';
 
@@ -22,6 +24,10 @@ interface Props {
   /** When true, filters run on full dataset loaded from API (not one page). */
   globalFilterActive?: boolean;
   datasetTotal?: number | null;
+  period: PeriodFilterState;
+  onPeriodChange: (next: PeriodFilterState) => void;
+  pocInPeriodCount?: number;
+  pocTotalCount?: number;
   onReset: () => void;
 }
 
@@ -42,6 +48,10 @@ export function GlobalFilterBar({
   totalCount,
   globalFilterActive = false,
   datasetTotal = null,
+  period,
+  onPeriodChange,
+  pocInPeriodCount,
+  pocTotalCount,
   onReset,
 }: Props) {
   const patch = (partial: Partial<ClaimsFilterState>) =>
@@ -67,15 +77,25 @@ export function GlobalFilterBar({
     filters.amountMax.trim() !== '' ||
     filters.flaggedOnly;
 
+  const hasActivePeriod = isPeriodFilterActive(period);
+
   return (
     <div className="global-filter-bar" role="search" aria-label="Wyszukiwanie i filtry">
+      <PeriodFilterRow
+        period={period}
+        onPeriodChange={onPeriodChange}
+        recordsInPeriod={pocInPeriodCount}
+        recordsTotal={pocTotalCount}
+      />
+
       <div className="global-filter-bar-head">
         <span className="global-filter-bar-title">Wyszukiwanie i filtry</span>
-        {(section === 'claims'
-          ? hasActiveClaimsFilters
-          : section === 'vehicles'
-            ? hasActiveVehicleFilters
-            : hasActiveCompanyFilters) && (
+        {(hasActivePeriod ||
+          (section === 'claims'
+            ? hasActiveClaimsFilters
+            : section === 'vehicles'
+              ? hasActiveVehicleFilters
+              : hasActiveCompanyFilters)) && (
           <button type="button" className="btn btn-link-reset" onClick={onReset}>
             Wyczyść
           </button>

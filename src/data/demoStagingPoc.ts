@@ -143,9 +143,15 @@ export function generateStagingDemoPocRecords(
     for (let i = 0; i < want; i++) {
       const t = templates[i]!;
       seq += 1;
+      const daysAgo = (seq % 75) + i * 3 + (plate.length % 20);
+      const serviceDate = new Date();
+      serviceDate.setDate(serviceDate.getDate() - daysAgo);
+      const dateIso = serviceDate.toISOString().slice(0, 10);
       out.push({
         Id: `demo-boost-${seq}`,
         CarRegistration: plate,
+        Date: dateIso,
+        ServiceDate: dateIso,
         ServiceName: t.serviceName,
         ServiceType: t.serviceType ?? t.serviceName,
         CompanyName: t.companyName,

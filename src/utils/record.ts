@@ -162,6 +162,33 @@ export function pickField(r: DpdRecord, ...keys: string[]): string {
   return '—';
 }
 
+function parseRecordDateValue(v: unknown): Date | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number' && v > 1_000_000_000_000) return new Date(v);
+  if (typeof v === 'string') {
+    const d = Date.parse(v);
+    if (Number.isFinite(d)) return new Date(d);
+  }
+  return null;
+}
+
+/** Data rozliczenia (faktura / usługa); fallback CreateTime z Fabric. */
+export function getRecordDate(r: DpdRecord): Date | null {
+  const normalized = normalizeDpdRecord(r);
+  const keys = [
+    ...FIELD_ALIASES.date,
+    'CreateTime',
+    'createTime',
+    'UpdateTime',
+  ];
+  for (const key of keys) {
+    const v = normalized[key] ?? resolveRecordField(normalized, key, key);
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  return null;
+}
+
 /** Map ChoiceSet raw value (number, string, expanded object) to display label. */
 export function resolveChoiceSetLabel(
   raw: unknown,
