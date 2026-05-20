@@ -47,6 +47,9 @@ export function isLikelyFlagged(r: DpdRecord, tableColumns?: TableColumn[]): boo
   const ar = pickField(r, 'anomalyReason');
   if (ar && ar !== '—' && (ar === 'true' || ar === 'Tak' || /anomal/i.test(ar))) return true;
 
+  const ff = pickField(r, 'fraudFlag');
+  if (ff && ff !== '—' && (ff === 'true' || ff === 'Tak' || /fraud/i.test(ff))) return true;
+
   return false;
 }
 

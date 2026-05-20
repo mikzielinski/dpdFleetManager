@@ -17,6 +17,8 @@ import {
   type VehicleFlagHistoryItem,
 } from './services/dataFabric';
 import { CompaniesSection } from './components/CompaniesSection';
+import { CompliancePanel } from './components/CompliancePanel';
+import { FleetStatsPanel } from './components/FleetStatsPanel';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import {
   DEFAULT_CLAIMS_FILTERS,
@@ -44,6 +46,17 @@ import {
   type CompanyCatalogData,
 } from './services/companyCatalog';
 import {
+  fleetMedianCostPerClaim,
+  statsForCompany,
+  statsForFleet,
+  statsForVehicle,
+} from './services/fleetStats';
+import {
+  downloadCompanyReportPdf,
+  downloadFleetSummaryPdf,
+  downloadVehicleReportPdf,
+} from './services/reportPdf';
+import {
   buildPocCountByVehicleId,
   filterVehicleCatalog,
   loadVehicleCatalog,
@@ -51,6 +64,8 @@ import {
   type VehicleCatalogData,
   type VehicleCatalogItem,
 } from './services/vehicleCatalog';
+import { computeHealthScore } from './utils/healthScore';
+import { extractVehicleCompliance } from './utils/vehicleCompliance';
 import {
   DEFAULT_COMPANY_FILTERS,
   type CompanyFilterState,
@@ -165,15 +180,68 @@ export default function App() {
     return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
   }, [records, tableColumns]);
 
-  const filteredVehicles = useMemo(() => {
+  const fleetMedianCost = useMemo(
+    () => fleetMedianCostPerClaim(allPocCosts),
+    [allPocCosts],
+  );
+
+  const enrichedVehicles = useMemo((): VehicleCatalogItem[] => {
     if (!vehicleCatalog) return [];
-    return filterVehicleCatalog(vehicleCatalog.vehicles, vehicleFilters);
-  }, [vehicleCatalog, vehicleFilters]);
+    return vehicleCatalog.vehicles.map((v) => {
+      const compliance = v.compliance ?? extractVehicleCompliance(v.raw, v.registration);
+      const stats = statsForVehicle(
+        v,
+        allPocCosts,
+        vehicleCatalog.pocVehicleFieldNames,
+        tableColumns,
+      );
+      const health = computeHealthScore({
+        stats,
+        complianceIssueCount: compliance.complianceIssues.length,
+        fleetMedianCostPerClaim: fleetMedianCost,
+      });
+      return {
+        ...v,
+        compliance,
+        healthScore: health.score,
+        healthGrade: health.grade,
+        totalCost: stats.totalCost,
+      };
+    });
+  }, [vehicleCatalog, allPocCosts, tableColumns, fleetMedianCost]);
+
+  const filteredVehicles = useMemo(() => {
+    return filterVehicleCatalog(enrichedVehicles, vehicleFilters);
+  }, [enrichedVehicles, vehicleFilters]);
+
+  const enrichedCompanies = useMemo(() => {
+    if (!companyCatalog) return [];
+    return companyCatalog.companies.map((c) => {
+      const stats = statsForCompany(
+        c.name,
+        enrichedVehicles,
+        allPocCosts,
+        vehicleCatalog?.pocVehicleFieldNames ?? [],
+        tableColumns,
+      );
+      const health = computeHealthScore({
+        stats,
+        complianceIssueCount: 0,
+        fleetMedianCostPerClaim: fleetMedianCost,
+      });
+      return {
+        ...c,
+        healthScore: health.score,
+        healthGrade: health.grade,
+        totalCost: stats.totalCost,
+      };
+    });
+  }, [companyCatalog, enrichedVehicles, allPocCosts, vehicleCatalog, tableColumns, fleetMedianCost]);
 
   const filteredCompanies = useMemo(() => {
-    if (!companyCatalog) return [];
-    return filterCompanyCatalog(companyCatalog.companies, companyFilters);
-  }, [companyCatalog, companyFilters]);
+    const base = enrichedCompanies.length ? enrichedCompanies : (companyCatalog?.companies ?? []);
+    return filterCompanyCatalog(base, companyFilters);
+  }, [enrichedCompanies, companyCatalog, companyFilters]);
 
   const vehicleIdsByPlate = useMemo(() => {
     const map = new Map<string, string>();
@@ -195,9 +263,58 @@ export default function App() {
   }, [allPocCosts, vehicleCatalog, vehicleIdsByPlate]);
 
   const activeVehicle = useMemo((): VehicleCatalogItem | null => {
-    if (!activeVehicleId || !vehicleCatalog) return null;
-    return vehicleCatalog.vehicles.find((v) => v.id === activeVehicleId) ?? null;
-  }, [activeVehicleId, vehicleCatalog]);
+    if (!activeVehicleId) return null;
+    return enrichedVehicles.find((v) => v.id === activeVehicleId) ?? null;
+  }, [activeVehicleId, enrichedVehicles]);
+
+  const activeVehicleStats = useMemo(() => {
+    if (!activeVehicle || !vehicleCatalog) return null;
+    return statsForVehicle(
+      activeVehicle,
+      allPocCosts,
+      vehicleCatalog.pocVehicleFieldNames,
+      tableColumns,
+    );
+  }, [activeVehicle, allPocCosts, vehicleCatalog, tableColumns]);
+
+  const activeVehicleHealth = useMemo(() => {
+    if (!activeVehicleStats || !activeVehicle) return null;
+    return computeHealthScore({
+      stats: activeVehicleStats,
+      complianceIssueCount: activeVehicle.compliance?.complianceIssues.length ?? 0,
+      fleetMedianCostPerClaim: fleetMedianCost,
+    });
+  }, [activeVehicleStats, activeVehicle, fleetMedianCost]);
+
+  const activeCompany = useMemo(() => {
+    if (!activeCompanyId) return null;
+    return filteredCompanies.find((c) => c.id === activeCompanyId) ?? null;
+  }, [activeCompanyId, filteredCompanies]);
+
+  const activeCompanyStats = useMemo(() => {
+    if (!activeCompany || !vehicleCatalog) return null;
+    return statsForCompany(
+      activeCompany.name,
+      enrichedVehicles,
+      allPocCosts,
+      vehicleCatalog.pocVehicleFieldNames,
+      tableColumns,
+    );
+  }, [activeCompany, enrichedVehicles, allPocCosts, vehicleCatalog, tableColumns]);
+
+  const activeCompanyHealth = useMemo(() => {
+    if (!activeCompanyStats) return null;
+    return computeHealthScore({
+      stats: activeCompanyStats,
+      complianceIssueCount: 0,
+      fleetMedianCostPerClaim: fleetMedianCost,
+    });
+  }, [activeCompanyStats, fleetMedianCost]);
+
+  const fleetStats = useMemo(
+    () => statsForFleet(allPocCosts, tableColumns),
+    [allPocCosts, tableColumns],
+  );
 
   const activeVehicleCosts = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return [];
@@ -641,6 +758,20 @@ export default function App() {
         >
           Firma
         </button>
+        <button
+          type="button"
+          className="main-nav-btn main-nav-btn-report"
+          title="Podsumowanie floty PDF"
+          onClick={() => {
+            downloadFleetSummaryPdf({
+              stats: fleetStats,
+              vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
+              companyCount: companyCatalog?.totalCompanies ?? 0,
+            });
+          }}
+        >
+          Raport floty PDF
+        </button>
       </nav>
 
       <GlobalFilterBar
@@ -963,19 +1094,21 @@ export default function App() {
                       <th>Pojazd</th>
                       <th>Region / miasto</th>
                       <th>Firma kurierska</th>
-                      <th className="col-numeric">Zgłoszeń POC</th>
+                      <th className="col-numeric">Health</th>
+                      <th className="col-numeric">Koszty</th>
+                      <th className="col-numeric">POC</th>
                     </tr>
                   </thead>
                   <tbody>
                     {vehicleCatalogLoading ? (
                       <tr>
-                        <td colSpan={4} className="center">
+                        <td colSpan={6} className="center">
                           Ładowanie pojazdów i słowników regionów / firm…
                         </td>
                       </tr>
                     ) : filteredVehicles.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="center">
+                        <td colSpan={6} className="center">
                           {vehicleCatalog
                             ? 'Brak pojazdów spełniających filtry.'
                             : 'Brak danych pojazdów.'}
@@ -994,6 +1127,20 @@ export default function App() {
                             <td>{v.registration}</td>
                             <td>{v.areaLabel || '—'}</td>
                             <td>{v.companyLabel || '—'}</td>
+                            <td className="col-numeric">
+                              {v.healthGrade ? (
+                                <span className={`health-grade health-grade-${v.healthGrade.toLowerCase()}`}>
+                                  {v.healthScore}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="col-numeric">
+                              {v.totalCost != null && v.totalCost > 0
+                                ? v.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
+                                : '—'}
+                            </td>
                             <td className="col-numeric">{pocCount}</td>
                           </tr>
                         );
@@ -1046,7 +1193,28 @@ export default function App() {
                     </button>
                   </div>
 
-                  <h3 className="section-title">Koszty DPD_POC (cała baza)</h3>
+                  {activeVehicle.compliance && <CompliancePanel compliance={activeVehicle.compliance} />}
+
+                  {activeVehicleStats && activeVehicleHealth && (
+                    <FleetStatsPanel
+                      stats={activeVehicleStats}
+                      health={activeVehicleHealth}
+                      title="Statystyki kosztów pojazdu"
+                      onExportPdf={() => {
+                        const compliance =
+                          activeVehicle.compliance ??
+                          extractVehicleCompliance(activeVehicle.raw, activeVehicle.registration);
+                        downloadVehicleReportPdf({
+                          vehicle: activeVehicle,
+                          stats: activeVehicleStats,
+                          health: activeVehicleHealth,
+                          compliance,
+                        });
+                      }}
+                    />
+                  )}
+
+                  <h3 className="section-title">Rozliczenia w rejestrze</h3>
                   <div className="table-wrap table-wrap-nested">
                     <table>
                       <thead>
@@ -1099,14 +1267,25 @@ export default function App() {
             loading={companyCatalogLoading}
             error={companyCatalogError}
             filtered={filteredCompanies}
-            fleetVehicles={vehicleCatalog?.vehicles ?? []}
+            fleetVehicles={enrichedVehicles}
             activeCompanyId={activeCompanyId}
+            activeCompanyStats={activeCompanyStats}
+            activeCompanyHealth={activeCompanyHealth}
             onSelectCompany={setActiveCompanyId}
             onRefresh={() => {
               setCompanyCatalog(null);
               void loadCompanyTabData();
             }}
             onOpenVehicle={openVehicleInFleet}
+            onExportCompanyPdf={() => {
+              if (!activeCompany || !activeCompanyStats || !activeCompanyHealth) return;
+              downloadCompanyReportPdf({
+                company: activeCompany,
+                stats: activeCompanyStats,
+                health: activeCompanyHealth,
+                vehicles: enrichedVehicles.filter((v) => v.companyLabel === activeCompany.name),
+              });
+            }}
           />
         )}
       </div>

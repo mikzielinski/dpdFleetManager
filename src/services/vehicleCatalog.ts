@@ -16,6 +16,8 @@ import {
   resolveRelationshipLabel,
   resolveSchemaFieldName,
 } from '../utils/entityFields';
+import { extractVehicleCompliance, type VehicleCompliance } from '../utils/vehicleCompliance';
+import type { HealthGrade } from '../utils/healthScore';
 import { normalizeDpdRecord, normalizeRegistration, registrationsMatch, type DpdRecord } from '../utils/record';
 import { BYPASS_AUTH } from './demoData';
 import { fetchAllEntityRecords } from './dataFabric';
@@ -26,6 +28,10 @@ export interface VehicleCatalogItem {
   areaLabel: string;
   companyLabel: string;
   raw: DpdRecord;
+  compliance?: VehicleCompliance;
+  healthScore?: number;
+  healthGrade?: HealthGrade;
+  totalCost?: number;
 }
 
 export interface VehicleCatalogData {
@@ -535,12 +541,14 @@ export async function loadVehicleCatalog(
       COMPANY_INLINE_FIELDS,
       companyMap,
     );
+    const reg = blankLabel(registration);
     return {
-      id: id || registration,
-      registration: blankLabel(registration),
+      id: id || reg,
+      registration: reg,
       areaLabel: blankLabel(areaLabel),
       companyLabel: blankLabel(companyLabel),
       raw: row,
+      compliance: extractVehicleCompliance(row, reg, vehiclesEntity),
     };
   });
 

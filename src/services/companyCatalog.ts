@@ -9,6 +9,7 @@ import {
   resolveRelationshipLabel,
   resolveSchemaFieldName,
 } from '../utils/entityFields';
+import type { HealthGrade } from '../utils/healthScore';
 import { normalizeDpdRecord, type DpdRecord } from '../utils/record';
 import { BYPASS_AUTH } from './demoData';
 import { fetchAllEntityRecords } from './dataFabric';
@@ -20,6 +21,9 @@ export interface CompanyCatalogItem {
   areaLabel: string;
   vehicleCount: number;
   raw: DpdRecord;
+  healthScore?: number;
+  healthGrade?: HealthGrade;
+  totalCost?: number;
 }
 
 export interface CompanyCatalogData {
