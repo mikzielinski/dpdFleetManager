@@ -3,6 +3,11 @@ import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
 import type { UiPath } from '@uipath/uipath-typescript/core';
 import { DATA_FABRIC_ENTITY_LOOKUP, DPD_POC_ENTITY_ID } from '../config';
 import {
+  isPocInvoiceVendorName,
+  pickSyntheticPartner,
+  SYNTHETIC_B2B_PARTNERS,
+} from '../data/syntheticB2BVendors';
+import {
   buildLookupMap,
   extractRelationshipId,
   findRelationshipFieldNames,
@@ -32,6 +37,8 @@ export interface VehicleCatalogData {
   pocVehicleFieldNames: string[];
   /** Region/firma uzupełnione z kosztów POC (brak relacji na B2B_Vehicles). */
   labelsFromPoc?: boolean;
+  /** Część etykiet z fikcyjnej puli partnerów B2B (staging / brak relacji). */
+  labelsSynthetic?: boolean;
 }
 
 const REGISTRATION_FIELDS = [
@@ -312,12 +319,51 @@ export function applyPocEnrichment(
     a.localeCompare(b, 'pl'),
   );
 
-  return {
+  const withSynthetic = applySyntheticB2BLabels({
     ...catalog,
     vehicles,
     areaOptions,
     companyOptions,
     labelsFromPoc: true,
+  });
+
+  return withSynthetic;
+}
+
+/**
+ * Uzupełnia brakujące (i zastępuje nazwy ze stacji POC) fikcyjnymi partnerami B2B DPD.
+ */
+export function applySyntheticB2BLabels(catalog: VehicleCatalogData): VehicleCatalogData {
+  if (!SYNTHETIC_B2B_PARTNERS.length) return catalog;
+
+  let syntheticCount = 0;
+  const vehicles = catalog.vehicles.map((v) => {
+    const needsCompany = !v.companyLabel || isPocInvoiceVendorName(v.companyLabel);
+    const needsArea = !v.areaLabel;
+    if (!needsCompany && !needsArea) return v;
+
+    const partner = pickSyntheticPartner(v.registration || v.id);
+    syntheticCount += 1;
+    return {
+      ...v,
+      companyLabel: needsCompany ? partner.company : v.companyLabel,
+      areaLabel: needsArea ? partner.area : v.areaLabel,
+    };
+  });
+
+  const areaOptions = [...new Set(vehicles.map((x) => x.areaLabel).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pl'),
+  );
+  const companyOptions = [...new Set(vehicles.map((x) => x.companyLabel).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, 'pl'),
+  );
+
+  return {
+    ...catalog,
+    vehicles,
+    areaOptions,
+    companyOptions,
+    labelsSynthetic: syntheticCount > 0,
   };
 }
 
@@ -340,8 +386,8 @@ function mockVehicleCatalog(): VehicleCatalogData {
     {
       id: 'v1',
       registration: 'WR145DPD',
-      areaLabel: 'Wrocław — centrum',
-      companyLabel: 'BP Polska',
+      areaLabel: 'Wrocław Centrum',
+      companyLabel: 'Trans-Hex Kurier B2B Sp. z o.o.',
       raw: { Id: 'v1', CarRegistration: 'WR145DPD' },
     },
     {
@@ -538,7 +584,7 @@ export async function loadVehicleCatalog(
     pocVehicleFieldNames: schemaPocFields,
   };
 
-  if (!pocCosts?.length) return base;
+  if (!pocCosts?.length) return applySyntheticB2BLabels(base);
 
   return applyPocEnrichment(base, pocCosts, {
     companyRows,
