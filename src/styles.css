@@ -243,21 +243,24 @@ body {
 }
 
 .period-preset-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  max-width: 720px;
 }
 
 .period-chip {
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
+  padding: 8px 10px;
   border: 1px solid #a4b1b8;
-  border-radius: 20px;
+  border-radius: 8px;
   background: #f8f9fa;
   color: #333;
   cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .period-chip:hover {
@@ -473,26 +476,63 @@ body {
   max-height: calc(100vh - 220px);
 }
 
-table {
+table,
+table.fleet-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: auto;
 }
 
+table.fleet-table th,
+table.fleet-table td,
 th,
 td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid #eee;
   text-align: left;
-  white-space: nowrap;
+  vertical-align: middle;
 }
 
-th {
-  background: #fafafa;
+table.fleet-table thead th {
+  background: #f3f4f5;
   font-weight: 700;
+  font-size: 12px;
+  color: #444;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
+  box-shadow: 0 1px 0 #e0e0e0;
+}
+
+table.fleet-table tbody tr:nth-child(even) {
+  background: #fcfcfc;
+}
+
+table.fleet-table tbody td {
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+table.fleet-table tbody td.col-text-wrap {
+  white-space: normal;
+  line-height: 1.35;
+  max-width: 200px;
+}
+
+table.fleet-table .col-check {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  text-align: center;
+  padding: 8px 6px;
+}
+
+table.fleet-table .col-check input {
+  margin: 0;
+  vertical-align: middle;
 }
 
 tbody tr {
@@ -500,7 +540,21 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: #faf6f6;
+  background: #faf6f6 !important;
+}
+
+/* Tabele bez fleet-table (np. compliance) */
+table:not(.fleet-table) th {
+  background: #fafafa;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+table:not(.fleet-table) th,
+table:not(.fleet-table) td {
+  white-space: nowrap;
 }
 
 .row-active {
@@ -1104,11 +1158,16 @@ tbody tr:hover {
 
 .category-bar-row {
   display: grid;
-  grid-template-columns: 140px 1fr 100px;
-  gap: 8px;
+  grid-template-columns: minmax(88px, 1.1fr) minmax(64px, 2fr) minmax(72px, auto);
+  gap: 8px 10px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 12px;
+}
+
+.category-bar-label {
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .category-bar-track {
@@ -1176,24 +1235,32 @@ tbody tr:hover {
 }
 
 .th-sortable {
-  padding: 0;
-  white-space: nowrap;
+  padding: 0 !important;
+  vertical-align: middle;
 }
 
 .th-sort-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 6px;
   width: 100%;
+  min-height: 42px;
   padding: 10px 12px;
   border: none;
   background: transparent;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 12px;
-  color: #555;
+  color: #444;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+table.fleet-table thead th.col-numeric .th-sort-btn {
+  justify-content: flex-end;
+  flex-direction: row-reverse;
 }
 
 .th-sort-btn:hover {
@@ -1226,19 +1293,32 @@ tbody tr:hover {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dash-chart-card {
-  padding: 12px;
-  background: #fafafa;
+  padding: 14px 16px;
+  background: #fff;
   border: 1px solid #e8e8e6;
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  min-height: 0;
 }
 
 .dash-chart-wide {
   grid-column: 1 / -1;
+}
+
+.dash-chart-donut-wrap {
+  min-height: 200px;
 }
 
 .dash-bar-fill {
@@ -1256,39 +1336,58 @@ tbody tr:hover {
 .dash-column-chart {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  min-height: 140px;
-  padding: 8px 0;
+  justify-content: center;
+  gap: 12px;
+  height: 168px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid #eee;
 }
 
 .dash-column {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-width: 0;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 52px;
+  max-width: 96px;
+  gap: 6px;
+}
+
+.dash-column-bar-wrap {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 56px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 0;
 }
 
 .dash-column-bar {
   width: 100%;
-  max-width: 48px;
-  min-height: 4px;
+  min-height: 6px;
   background: linear-gradient(180deg, #dc0032, #a80028);
-  border-radius: 4px 4px 0 0;
-  align-self: stretch;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.15s ease;
 }
 
 .dash-column-label {
-  font-size: 10px;
-  color: #666;
+  font-size: 11px;
+  color: #555;
   text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash-column-value {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   color: #333;
+  font-variant-numeric: tabular-nums;
 }
 
 .dash-bar-fuel {
@@ -1310,7 +1409,8 @@ tbody tr:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  gap: 24px;
 }
 
 .dash-donut {
@@ -1383,8 +1483,8 @@ tbody tr:hover {
 
 .dash-stat-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
 }
 
 .dash-stat-card {

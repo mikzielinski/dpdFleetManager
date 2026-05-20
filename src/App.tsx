@@ -1026,10 +1026,10 @@ export default function App() {
               {tableError && <p className="error-text">{tableError}</p>}
 
               <div className="table-wrap">
-                <table>
+                <table className="fleet-table">
                   <thead>
                     <tr>
-                      <th>
+                      <th className="col-check">
                         <input
                           type="checkbox"
                           checked={
@@ -1082,7 +1082,7 @@ export default function App() {
                             className={selected ? 'row-active' : ''}
                             onClick={() => onRowClick(r)}
                           >
-                            <td onClick={(e) => e.stopPropagation()}>
+                            <td className="col-check" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selectedIds.has(id)}
@@ -1090,7 +1090,20 @@ export default function App() {
                               />
                             </td>
                             {tableColumns.map((c) => (
-                              <td key={c.key}>{displayField(r, c)}</td>
+                              <td
+                                key={c.key}
+                                className={
+                                  c.key === 'netPrice' || c.key === 'amount'
+                                    ? 'col-numeric'
+                                    : c.key === 'companyName' ||
+                                        c.key === 'serviceName' ||
+                                        c.key === 'carRegistration'
+                                      ? 'col-text-wrap'
+                                      : undefined
+                                }
+                              >
+                                {displayField(r, c)}
+                              </td>
                             ))}
                           </tr>
                         );
@@ -1275,7 +1288,7 @@ export default function App() {
               {vehicleCatalogError && <p className="error-text">{vehicleCatalogError}</p>}
 
               <div className="table-wrap">
-                <table>
+                <table className="fleet-table">
                   <thead>
                     <tr>
                       <SortableTh
@@ -1345,8 +1358,8 @@ export default function App() {
                             onClick={() => setActiveVehicleId(v.id)}
                           >
                             <td>{v.registration}</td>
-                            <td>{v.areaLabel || '—'}</td>
-                            <td>{v.companyLabel || '—'}</td>
+                            <td className="col-text-wrap">{v.areaLabel || '—'}</td>
+                            <td className="col-text-wrap">{v.companyLabel || '—'}</td>
                             <td className="col-numeric">
                               {v.healthGrade ? (
                                 <span className={`health-grade health-grade-${v.healthGrade.toLowerCase()}`}>
@@ -1452,7 +1465,7 @@ export default function App() {
 
                   <h3 className="section-title">Rozliczenia w rejestrze</h3>
                   <div className="table-wrap table-wrap-nested">
-                    <table>
+                    <table className="fleet-table">
                       <thead>
                         <tr>
                           <th>Usługa</th>

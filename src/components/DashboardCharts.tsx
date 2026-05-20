@@ -91,14 +91,16 @@ export function ColumnChart({
       <h4 className="stats-subtitle">{title}</h4>
       <div className="dash-column-chart" role="img" aria-label={title}>
         {rows.map((m) => {
-          const h = Math.max(6, Math.round((m.total / max) * 100));
+          const barPx = Math.max(8, Math.round((m.total / max) * 120));
           return (
             <div
               key={m.label}
               className="dash-column"
               title={`${m.label}: ${formatPln(m.total)} PLN (${m.count})`}
             >
-              <div className="dash-column-bar" style={{ height: `${h}%` }} />
+              <div className="dash-column-bar-wrap">
+                <div className="dash-column-bar" style={{ height: `${barPx}px` }} />
+              </div>
               <span className="dash-column-label">{m.label}</span>
               <span className="dash-column-value">{formatPln(m.total)}</span>
             </div>

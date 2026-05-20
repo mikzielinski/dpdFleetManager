@@ -87,7 +87,7 @@ export function CompaniesSection({
         {error && <p className="error-text">{error}</p>}
 
         <div className="table-wrap">
-          <table>
+          <table className="fleet-table">
             <thead>
               <tr>
                 <SortableTh label="Firma" sortKey="name" sort={companySort} onSort={onSort} />
@@ -135,8 +135,8 @@ export function CompaniesSection({
                     className={activeCompanyId === c.id ? 'row-active' : ''}
                     onClick={() => onSelectCompany(c.id)}
                   >
-                    <td>{c.name}</td>
-                    <td>{c.areaLabel || '—'}</td>
+                    <td className="col-text-wrap">{c.name}</td>
+                    <td className="col-text-wrap">{c.areaLabel || '—'}</td>
                     <td className="col-numeric">
                       {c.healthGrade ? (
                         <span className={healthGradeClass(c.healthGrade)}>{c.healthScore}</span>
@@ -194,7 +194,7 @@ export function CompaniesSection({
 
             <h3 className="section-title">Pojazdy B2B</h3>
             <div className="table-wrap table-wrap-nested">
-              <table>
+              <table className="fleet-table">
                 <thead>
                   <tr>
                     <th>Rejestracja</th>
