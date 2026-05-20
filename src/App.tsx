@@ -38,6 +38,7 @@ import { AnalysisResults } from './components/AnalysisResults';
 import { InvoicePreview } from './components/InvoicePreview';
 import { VehicleCaseHistory } from './components/VehicleCaseHistory';
 import {
+  buildPocCountByVehicleId,
   filterVehicleCatalog,
   loadVehicleCatalog,
   matchCostsToVehicle,
@@ -154,16 +155,24 @@ export default function App() {
     return filterVehicleCatalog(vehicleCatalog.vehicles, vehicleFilters);
   }, [vehicleCatalog, vehicleFilters]);
 
-  const pocCountByPlate = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of allPocCosts) {
-      const reg = pickField(r, 'carRegistration');
-      if (!reg || reg === '—') continue;
-      const key = normalizeRegistration(reg);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+  const vehicleIdsByPlate = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!vehicleCatalog) return map;
+    for (const v of vehicleCatalog.vehicles) {
+      if (!v.registration.trim() || !v.id) continue;
+      map.set(normalizeRegistration(v.registration), v.id);
     }
-    return counts;
-  }, [allPocCosts]);
+    return map;
+  }, [vehicleCatalog]);
+
+  const pocCountByVehicleId = useMemo(() => {
+    if (!vehicleCatalog?.pocVehicleFieldNames.length) return new Map<string, number>();
+    return buildPocCountByVehicleId(
+      allPocCosts,
+      vehicleCatalog.pocVehicleFieldNames,
+      vehicleIdsByPlate,
+    );
+  }, [allPocCosts, vehicleCatalog, vehicleIdsByPlate]);
 
   const activeVehicle = useMemo((): VehicleCatalogItem | null => {
     if (!activeVehicleId || !vehicleCatalog) return null;
@@ -171,9 +180,13 @@ export default function App() {
   }, [activeVehicleId, vehicleCatalog]);
 
   const activeVehicleCosts = useMemo(() => {
-    if (!activeVehicle) return [];
-    return matchCostsToVehicle(allPocCosts, activeVehicle.registration);
-  }, [activeVehicle, allPocCosts]);
+    if (!activeVehicle || !vehicleCatalog) return [];
+    return matchCostsToVehicle(
+      allPocCosts,
+      activeVehicle,
+      vehicleCatalog.pocVehicleFieldNames,
+    );
+  }, [activeVehicle, allPocCosts, vehicleCatalog]);
 
   const activeRun = analysisRuns.find(
     (r) => r.status === 'running' || r.status === 'starting',
@@ -886,8 +899,7 @@ export default function App() {
                       </tr>
                     ) : (
                       filteredVehicles.map((v) => {
-                        const plateKey = normalizeRegistration(v.registration);
-                        const pocCount = pocCountByPlate.get(plateKey) ?? 0;
+                        const pocCount = pocCountByVehicleId.get(v.id) ?? 0;
                         const selectedV = activeVehicleId === v.id;
                         return (
                           <tr

@@ -305,21 +305,30 @@ export async function fetchAllDpdRecords(sdk: UiPath): Promise<{
     return { items, totalCount: items.length };
   }
 
-  const items = await fetchAllEntityRecords(sdk, DPD_POC_ENTITY_ID);
+  const items = await fetchAllEntityRecords(sdk, DPD_POC_ENTITY_ID, { expansionLevel: 2 });
   return { items, totalCount: items.length };
 }
 
-export async function fetchAllEntityRecords(sdk: UiPath, entityId: string): Promise<DpdRecord[]> {
+export type FetchAllEntityRecordsOptions = {
+  expansionLevel?: number;
+};
+
+export async function fetchAllEntityRecords(
+  sdk: UiPath,
+  entityId: string,
+  options?: FetchAllEntityRecordsOptions,
+): Promise<DpdRecord[]> {
   const entities = new Entities(sdk);
   const items: DpdRecord[] = [];
   let cursor: PaginationCursor | undefined;
   let guard = 0;
+  const expansionLevel = options?.expansionLevel ?? 1;
 
   do {
     const result = await entities.getAllRecords(entityId, {
       pageSize: 100,
       cursor,
-      expansionLevel: 1,
+      expansionLevel,
     });
     const page = normalizeRecordsPage(result, 100);
     items.push(...page.items.map((r) => normalizeDpdRecord(r)));

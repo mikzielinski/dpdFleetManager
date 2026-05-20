@@ -1,8 +1,15 @@
 import { Entities } from '@uipath/uipath-typescript/entities';
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
 import type { UiPath } from '@uipath/uipath-typescript/core';
-import { DATA_FABRIC_ENTITY_LOOKUP } from '../config';
-import { buildLookupMap, lookupLabel, pickRecordLabel, resolveSchemaFieldName } from '../utils/entityFields';
+import { DATA_FABRIC_ENTITY_LOOKUP, DPD_POC_ENTITY_ID } from '../config';
+import {
+  buildLookupMap,
+  findRelationshipFieldNames,
+  pickRecordLabel,
+  resolveLinkedVehicleId,
+  resolveRelationshipLabel,
+  resolveSchemaFieldName,
+} from '../utils/entityFields';
 import { normalizeDpdRecord, normalizeRegistration, registrationsMatch, type DpdRecord } from '../utils/record';
 import { BYPASS_AUTH } from './demoData';
 import { fetchAllEntityRecords } from './dataFabric';
@@ -20,6 +27,8 @@ export interface VehicleCatalogData {
   areaOptions: string[];
   companyOptions: string[];
   totalVehicles: number;
+  /** Schema-derived POC → B2B vehicle relationship field names (for cost matching). */
+  pocVehicleFieldNames: string[];
 }
 
 const REGISTRATION_FIELDS = [
@@ -60,6 +69,17 @@ const COMPANY_REF_FIELDS = [
 ] as const;
 
 const COMPANY_INLINE_FIELDS = ['CompanyName', 'CourierCompanyName', 'FirmName', 'ContractorName'] as const;
+
+const POC_VEHICLE_REF_FIELDS = [
+  'Vehicle',
+  'B2BVehicle',
+  'DPDB2BVehicle',
+  'DPDB2BVehicles',
+  'DPD_B2B_Vehicle',
+  'DPD_B2B_Vehicles',
+  'VehicleId',
+  'VehicleID',
+] as const;
 
 const AREA_LABEL_FIELDS = [
   'Name',
@@ -126,10 +146,20 @@ function mockVehicleCatalog(): VehicleCatalogData {
   const companyOptions = [...new Set(vehicles.map((v) => v.companyLabel).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, 'pl'),
   );
-  return { vehicles, areaOptions, companyOptions, totalVehicles: vehicles.length };
+  return {
+    vehicles,
+    areaOptions,
+    companyOptions,
+    totalVehicles: vehicles.length,
+    pocVehicleFieldNames: [...POC_VEHICLE_REF_FIELDS],
+  };
 }
 
-/** Load B2B vehicles with area / courier company labels from related Data Fabric entities. */
+function blankLabel(label: string): string {
+  return label === '—' || !label.trim() ? '' : label;
+}
+
+/** Load B2B vehicles with area / courier company labels via Data Fabric relationships. */
 export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogData> {
   if (BYPASS_AUTH) {
     await Promise.resolve();
@@ -138,10 +168,11 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
 
   const entities = new Entities(sdk);
 
-  const [vehiclesEntity, areasEntity, companiesEntity] = await Promise.all([
+  const [vehiclesEntity, areasEntity, companiesEntity, pocEntity] = await Promise.all([
     resolveEntityByNames(entities, DATA_FABRIC_ENTITY_LOOKUP.b2bVehicles),
     resolveEntityByNames(entities, DATA_FABRIC_ENTITY_LOOKUP.areasWroclaw),
     resolveEntityByNames(entities, DATA_FABRIC_ENTITY_LOOKUP.b2bCourierCompanies),
+    entities.getById(DPD_POC_ENTITY_ID).catch(() => null),
   ]);
 
   if (!vehiclesEntity) {
@@ -150,13 +181,20 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
     );
   }
 
+  const pocVehicleFieldNames = findRelationshipFieldNames(
+    pocEntity,
+    DATA_FABRIC_ENTITY_LOOKUP.b2bVehicles,
+  );
+
   const regField =
     resolveSchemaFieldName(vehiclesEntity, REGISTRATION_FIELDS, /rejestrac|registration|pojazd|vehicle/i) ??
     'CarRegistration';
 
   const areaMap = areasEntity
     ? buildLookupMap(
-        (await fetchAllEntityRecords(sdk, areasEntity.id)).map((r) => normalizeDpdRecord(r)),
+        (await fetchAllEntityRecords(sdk, areasEntity.id, { expansionLevel: 1 })).map((r) =>
+          normalizeDpdRecord(r),
+        ),
         ['Id', 'id'],
         AREA_LABEL_FIELDS,
       )
@@ -164,43 +202,84 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
 
   const companyMap = companiesEntity
     ? buildLookupMap(
-        (await fetchAllEntityRecords(sdk, companiesEntity.id)).map((r) => normalizeDpdRecord(r)),
+        (await fetchAllEntityRecords(sdk, companiesEntity.id, { expansionLevel: 1 })).map((r) =>
+          normalizeDpdRecord(r),
+        ),
         ['Id', 'id'],
         COMPANY_LABEL_FIELDS,
       )
     : new Map<string, string>();
 
-  const vehicleRows = (await fetchAllEntityRecords(sdk, vehiclesEntity.id)).map((r) =>
-    normalizeDpdRecord(r),
-  );
+  const vehicleRows = (
+    await fetchAllEntityRecords(sdk, vehiclesEntity.id, { expansionLevel: 2 })
+  ).map((r) => normalizeDpdRecord(r));
+
+  const areaNames = areasEntity
+    ? [areasEntity.name, areasEntity.displayName, ...DATA_FABRIC_ENTITY_LOOKUP.areasWroclaw]
+    : DATA_FABRIC_ENTITY_LOOKUP.areasWroclaw;
+  const companyNames = companiesEntity
+    ? [companiesEntity.name, companiesEntity.displayName, ...DATA_FABRIC_ENTITY_LOOKUP.b2bCourierCompanies]
+    : DATA_FABRIC_ENTITY_LOOKUP.b2bCourierCompanies;
 
   const items: VehicleCatalogItem[] = vehicleRows.map((row) => {
     const id = String(row.Id ?? row.id ?? '');
     const registration = pickRecordLabel(row, [regField, ...REGISTRATION_FIELDS]);
-    const areaLabel = lookupLabel(areaMap, row, AREA_REF_FIELDS, AREA_INLINE_FIELDS);
-    const companyLabel = lookupLabel(companyMap, row, COMPANY_REF_FIELDS, COMPANY_INLINE_FIELDS);
+    const areaLabel = resolveRelationshipLabel(
+      row,
+      vehiclesEntity,
+      areaNames.filter(Boolean) as string[],
+      AREA_LABEL_FIELDS,
+      AREA_REF_FIELDS,
+      AREA_INLINE_FIELDS,
+      areaMap,
+    );
+    const companyLabel = resolveRelationshipLabel(
+      row,
+      vehiclesEntity,
+      companyNames.filter(Boolean) as string[],
+      COMPANY_LABEL_FIELDS,
+      COMPANY_REF_FIELDS,
+      COMPANY_INLINE_FIELDS,
+      companyMap,
+    );
     return {
       id: id || registration,
-      registration: registration === '—' ? '' : registration,
-      areaLabel: areaLabel === '—' ? '' : areaLabel,
-      companyLabel: companyLabel === '—' ? '' : companyLabel,
+      registration: blankLabel(registration),
+      areaLabel: blankLabel(areaLabel),
+      companyLabel: blankLabel(companyLabel),
       raw: row,
     };
   });
 
   const withPlate = items.filter((v) => v.registration.trim() !== '');
-  const areaOptions = [
-    ...new Set(withPlate.map((v) => v.areaLabel).filter(Boolean)),
-  ].sort((a, b) => a.localeCompare(b, 'pl'));
-  const companyOptions = [
-    ...new Set(withPlate.map((v) => v.companyLabel).filter(Boolean)),
-  ].sort((a, b) => a.localeCompare(b, 'pl'));
+  const areaOptions = [...new Set(withPlate.map((v) => v.areaLabel).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pl'),
+  );
+  const companyOptions = [...new Set(withPlate.map((v) => v.companyLabel).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'pl'),
+  );
+
+  const schemaPocFields =
+    pocVehicleFieldNames.length > 0 ? pocVehicleFieldNames : [...POC_VEHICLE_REF_FIELDS];
+
+  if (import.meta.env.DEV) {
+    const areaRel = findRelationshipFieldNames(vehiclesEntity, areaNames.filter(Boolean) as string[]);
+    const coRel = findRelationshipFieldNames(vehiclesEntity, companyNames.filter(Boolean) as string[]);
+    console.info('[vehicles] relationship fields', {
+      area: areaRel,
+      company: coRel,
+      pocToVehicle: schemaPocFields,
+      sampleCompany: withPlate[0]?.companyLabel,
+      sampleArea: withPlate[0]?.areaLabel,
+    });
+  }
 
   return {
     vehicles: withPlate,
     areaOptions,
     companyOptions,
     totalVehicles: withPlate.length,
+    pocVehicleFieldNames: schemaPocFields,
   };
 }
 
@@ -225,14 +304,52 @@ export function filterVehicleCatalog(
   });
 }
 
-/** POC cost rows for the same registration as the selected B2B vehicle. */
+/** Count POC rows per B2B vehicle Id (relationship), with registration fallback. */
+export function buildPocCountByVehicleId(
+  costs: DpdRecord[],
+  pocVehicleFieldNames: readonly string[],
+  vehicleIdsByNormalizedPlate: Map<string, string>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const r of costs) {
+    let vehicleId = resolveLinkedVehicleId(
+      r,
+      null,
+      DATA_FABRIC_ENTITY_LOOKUP.b2bVehicles,
+      pocVehicleFieldNames,
+    );
+    if (!vehicleId) {
+      const reg = pickRecordLabel(r, ['carRegistration', 'CarRegistration', 'CarRegistraction']);
+      if (reg !== '—') {
+        vehicleId = vehicleIdsByNormalizedPlate.get(normalizeRegistration(reg)) ?? '';
+      }
+    }
+    if (!vehicleId) continue;
+    counts.set(vehicleId, (counts.get(vehicleId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** POC cost rows for the selected B2B vehicle (relationship Id, then registration). */
 export function matchCostsToVehicle(
   costs: DpdRecord[],
-  registration: string,
+  vehicle: Pick<VehicleCatalogItem, 'id' | 'registration'>,
+  pocVehicleFieldNames: readonly string[],
 ): DpdRecord[] {
-  if (!registration.trim()) return [];
+  const vid = vehicle.id.trim();
+  const reg = vehicle.registration.trim();
+  if (!vid && !reg) return [];
+
   return costs.filter((r) => {
-    const reg = pickRecordLabel(r, ['carRegistration', 'CarRegistration', 'CarRegistraction']);
-    return registrationsMatch(reg, registration);
+    const linked = resolveLinkedVehicleId(
+      r,
+      null,
+      DATA_FABRIC_ENTITY_LOOKUP.b2bVehicles,
+      pocVehicleFieldNames,
+    );
+    if (vid && linked && linked.toLowerCase() === vid.toLowerCase()) return true;
+    if (!reg) return false;
+    const plate = pickRecordLabel(r, ['carRegistration', 'CarRegistration', 'CarRegistraction']);
+    return registrationsMatch(plate, reg);
   });
 }

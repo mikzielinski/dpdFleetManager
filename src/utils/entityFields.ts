@@ -1,6 +1,106 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
+import { FieldDisplayType } from '@uipath/uipath-typescript/entities';
 import { formatValue } from './record';
 import type { DpdRecord } from './record';
+
+/** Normalize entity API/display names for comparison (DPDB2BVehicles ≈ DPD_B2B_Vehicles). */
+export function normalizeEntityKey(name: string): string {
+  return name.toLowerCase().replace(/[\s_]/g, '');
+}
+
+export function entityNameMatches(
+  referenceEntityName: string | undefined,
+  candidates: readonly string[],
+): boolean {
+  if (!referenceEntityName?.trim()) return false;
+  const ref = normalizeEntityKey(referenceEntityName);
+  return candidates.some((c) => normalizeEntityKey(c) === ref);
+}
+
+/** Relationship fields on `entity` that point at one of `targetEntityNames`. */
+export function findRelationshipFieldNames(
+  entity: EntityGetResponse | null | undefined,
+  targetEntityNames: readonly string[],
+): string[] {
+  const names: string[] = [];
+  for (const f of entity?.fields ?? []) {
+    if (!f.name) continue;
+    if (f.fieldDisplayType !== FieldDisplayType.Relationship) continue;
+    const refName = f.referenceEntityName ?? f.referenceEntity?.name;
+    const refId = f.referenceEntity?.id;
+    const matchesName = entityNameMatches(refName, targetEntityNames);
+    const matchesId =
+      refId != null &&
+      targetEntityNames.some((t) => t.length > 30 && t.toLowerCase() === refId.toLowerCase());
+    if (matchesName || matchesId) names.push(f.name);
+  }
+  return names;
+}
+
+export function extractRelationshipId(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    const id = o.Id ?? o.id;
+    return id !== undefined && id !== null ? String(id) : '';
+  }
+  return String(value);
+}
+
+/** Label from an expanded relationship object or lookup map by FK id. */
+export function labelFromRelationshipField(
+  record: DpdRecord,
+  fieldName: string,
+  labelFields: readonly string[],
+  lookup?: Map<string, string>,
+): string {
+  const v = record[fieldName];
+  if (v === undefined || v === null || v === '') return '—';
+  if (typeof v === 'object' && !Array.isArray(v)) {
+    const label = pickRecordLabel(v as DpdRecord, labelFields);
+    if (label !== '—') return label;
+    const id = extractRelationshipId(v);
+    if (id && lookup?.has(id)) return lookup.get(id)!;
+    return id || '—';
+  }
+  const id = String(v);
+  if (lookup?.has(id)) return lookup.get(id)!;
+  return id || '—';
+}
+
+export function resolveRelationshipLabel(
+  row: DpdRecord,
+  entity: EntityGetResponse | null | undefined,
+  targetEntityNames: readonly string[],
+  labelFields: readonly string[],
+  fallbackRefFields: readonly string[],
+  inlineFields: readonly string[],
+  lookup?: Map<string, string>,
+): string {
+  const schemaFields = findRelationshipFieldNames(entity, targetEntityNames);
+  const refFields = schemaFields.length > 0 ? schemaFields : fallbackRefFields;
+  for (const fn of refFields) {
+    const label = labelFromRelationshipField(row, fn, labelFields, lookup);
+    if (label !== '—' && label.trim() !== '') return label;
+  }
+  return lookupLabel(lookup ?? new Map(), row, refFields, inlineFields);
+}
+
+/** Vehicle record Id linked from a DPD_POC cost row (relationship or registration fallback). */
+export function resolveLinkedVehicleId(
+  pocRow: DpdRecord,
+  pocEntity: EntityGetResponse | null | undefined,
+  vehicleEntityNames: readonly string[],
+  vehicleRefFallback: readonly string[],
+): string {
+  const fields = findRelationshipFieldNames(pocEntity, vehicleEntityNames);
+  const keys = fields.length > 0 ? fields : vehicleRefFallback;
+  for (const k of keys) {
+    const id = extractRelationshipId(pocRow[k]);
+    if (id) return id;
+  }
+  return '';
+}
 
 /** Pick first non-empty label from record keys (supports expanded relationship objects). */
 export function pickRecordLabel(record: DpdRecord, fieldNames: readonly string[]): string {
