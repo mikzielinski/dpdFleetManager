@@ -278,6 +278,48 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Detail pane: invoice quick preview beside (or above) metadata grid */
+.detail-split {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 959px) {
+  .detail-split-preview {
+    order: -1;
+  }
+}
+
+.detail-split-preview .preview-box {
+  min-height: 360px;
+}
+
+.detail-split-preview .preview-iframe {
+  height: min(52vh, 520px);
+}
+
+@media (min-width: 960px) {
+  .detail-split {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .detail-split-preview {
+    flex: 0 0 44%;
+    max-width: 520px;
+    position: sticky;
+    top: 8px;
+  }
+
+  .detail-split-main {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .detail-preview-card {
   background: #fff;
   border: 1px solid #e0e0e0;

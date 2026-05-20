@@ -623,41 +623,47 @@ export default function App() {
                     <span className="meta-value">{recordId(activeRecord)}</span>
                   </div>
 
-                  <h3 className="section-title">Szczegóły zgłoszenia</h3>
-                  <dl className="detail-grid">
-                    {[
-                      'carRegistration',
-                      'serviceName',
-                      'serviceDescription',
-                      'companyName',
-                      'taxId',
-                      'amount',
-                      'netPrice',
-                      'totalPrice',
-                      'date',
-                      'invoiceFileName',
-                      'decision',
-                      'anomalyReason',
-                      'comments',
-                      'riskLevel',
-                      'combinedScore',
-                      'flagType',
-                      'fleetManagerNote',
-                    ].map((key) => (
-                      <div key={key} className="detail-item">
-                        <dt>{key}</dt>
-                        <dd>{pickField(activeRecord, key)}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <div className="detail-split">
+                    <div className="detail-split-main">
+                      <h3 className="section-title">Szczegóły zgłoszenia</h3>
+                      <dl className="detail-grid">
+                        {[
+                          'carRegistration',
+                          'serviceName',
+                          'serviceDescription',
+                          'companyName',
+                          'taxId',
+                          'amount',
+                          'netPrice',
+                          'totalPrice',
+                          'date',
+                          'invoiceFileName',
+                          'decision',
+                          'anomalyReason',
+                          'comments',
+                          'riskLevel',
+                          'combinedScore',
+                          'flagType',
+                          'fleetManagerNote',
+                        ].map((key) => (
+                          <div key={key} className="detail-item">
+                            <dt>{key}</dt>
+                            <dd>{pickField(activeRecord, key)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
 
-                  <h3 className="section-title">Podgląd faktury</h3>
-                  <InvoicePreview
-                    blob={invoiceBlob}
-                    mime={invoiceMime}
-                    loading={invoiceLoading}
-                    error={invoiceError}
-                  />
+                    <aside className="detail-split-preview">
+                      <h3 className="section-title">Szybki podgląd faktury</h3>
+                      <InvoicePreview
+                        blob={invoiceBlob}
+                        mime={invoiceMime}
+                        loading={invoiceLoading}
+                        error={invoiceError}
+                      />
+                    </aside>
+                  </div>
 
                   <VehicleCaseHistory
                     items={vehicleHistory}
