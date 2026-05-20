@@ -1,5 +1,7 @@
+import { mileageKmInPeriod as mileageFromMonthlyModel } from '../data/demoMileageReports';
 import type { PeriodFilterState } from '../utils/periodFilter';
 import { resolvePeriodBounds } from '../utils/periodFilter';
+import { STAGING_COMPLIANCE_ENRICH_ENABLED } from '../utils/vehicleCompliance';
 import type { DpdRecord } from '../utils/record';
 import {
   getRecordDate,
@@ -103,6 +105,18 @@ export function mileageKmInPeriodFromFabric(
 
   if (readings.length === 0) {
     if (vehicleOdometerKm != null && vehicleOdometerKm > 0) {
+      if (STAGING_COMPLIANCE_ENRICH_ENABLED) {
+        const est = mileageFromMonthlyModel(registration, vehicleOdometerKm, period);
+        if (est.drivenKm != null && est.drivenKm > 0) {
+          return {
+            startKm: est.startKm,
+            endKm: est.endKm,
+            drivenKm: est.drivenKm,
+            source: 'vehicle_odometer',
+            reportCount: 1,
+          };
+        }
+      }
       return {
         startKm: null,
         endKm: vehicleOdometerKm,

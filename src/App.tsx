@@ -210,7 +210,7 @@ export default function App() {
   const enrichedVehicles = useMemo((): VehicleCatalogItem[] => {
     if (!vehicleCatalog) return [];
     return vehicleCatalog.vehicles.map((v) => {
-      const compliance = v.compliance ?? resolveVehicleCompliance(v.raw, v.registration);
+      const compliance = resolveVehicleCompliance(v.raw, v.registration);
       const stats = statsForVehicle(
         v,
         periodFilteredPoc,

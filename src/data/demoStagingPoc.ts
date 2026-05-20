@@ -1,6 +1,6 @@
 import type { DpdRecord } from '../utils/record';
 import { normalizeRegistration } from '../utils/record';
-import { getDemoCaseTag } from './demoFleetCases';
+import { getDemoCaseTag, getDemoFleetCompliance } from './demoFleetCases';
 export interface PocBoostVehicle {
   registration: string;
 }
@@ -160,6 +160,12 @@ function expandedTemplates(plate: string, tag: ReturnType<typeof getDemoCaseTag>
   return [...base, ...EXTRA_BY_PLATE.slice(h), ...EXTRA_BY_PLATE.slice(0, h)].slice(0, 8);
 }
 
+function estimatedOdometerAt(plate: string, daysAgo: number): number {
+  const end = getDemoFleetCompliance(plate).mileageKm ?? 120_000;
+  const monthly = 1200 + (normalizeRegistration(plate).length % 600);
+  return Math.max(8000, Math.round(end - (daysAgo / 28) * monthly));
+}
+
 function existingCountForPlate(allPoc: DpdRecord[], plate: string): number {
   const key = normalizeRegistration(plate);
   return allPoc.filter((r) => {
@@ -195,17 +201,21 @@ export function generateStagingDemoPocRecords(
       const serviceDate = new Date();
       serviceDate.setDate(serviceDate.getDate() - daysAgo);
       const dateIso = serviceDate.toISOString().slice(0, 10);
+      const odometerKm = estimatedOdometerAt(plate, daysAgo);
+      const isMileageReport = i === 0;
       out.push({
         Id: `demo-boost-${seq}`,
         CarRegistration: plate,
         Date: dateIso,
         ServiceDate: dateIso,
-        ServiceName: t.serviceName,
-        ServiceType: t.serviceType ?? t.serviceName,
+        ServiceName: isMileageReport ? 'Raport przebiegu kierowcy' : t.serviceName,
+        ServiceType: isMileageReport ? 'Mileage Report' : (t.serviceType ?? t.serviceName),
         CompanyName: t.companyName,
         TaxID: `899${String(seq).padStart(7, '0')}`.slice(0, 10),
-        NetPrice: t.netPrice,
-        Amount: 1,
+        NetPrice: isMileageReport ? 0 : t.netPrice,
+        Amount: isMileageReport ? 1 : 1,
+        Mileage: odometerKm,
+        Przebieg: odometerKm,
         Status: t.decision,
         decision: t.decision,
         FlagType: t.flagType ?? '',

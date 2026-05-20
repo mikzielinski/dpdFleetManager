@@ -30,7 +30,10 @@ export function FuelRegionPanel({
               {vehicleStats.drivenKm != null
                 ? `${vehicleStats.drivenKm.toLocaleString('pl-PL')} km`
                 : '—'}
-              <span className="hint-inline"> (DPD_POC — odczyty licznika)</span>
+              <span className="hint-inline">
+                {' '}
+                (DPD_POC / model miesięczny z licznika B2B)
+              </span>
             </dd>
           </div>
           <div className="detail-item">
@@ -84,8 +87,8 @@ export function FuelRegionPanel({
 
       {vehicleStats && vehicleStats.drivenKm == null && vehicleStats.fuelCount > 0 && (
         <p className="filter-hint">
-          Brak przebiegu w okresie — dodaj w Data Fabric pole Przebieg/Mileage na rozliczeniu POC z datą
-          lub raport kierowcy (usługa z przebiegiem).
+          Brak przebiegu w okresie — uzupełnij Mileage na POC lub MileageKM na pojeździe B2B (po odświeżeniu
+          katalogu pojazdów).
         </p>
       )}
 

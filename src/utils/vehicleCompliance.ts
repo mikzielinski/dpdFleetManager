@@ -149,10 +149,13 @@ export function extractVehicleCompliance(
   };
 }
 
-function complianceHasFabricData(c: VehicleCompliance): boolean {
-  if (c.mileageKm != null) return true;
-  if (c.inspectionValidUntil) return true;
-  return c.policies.some((p) => p.validUntil != null);
+function policiesComplete(c: VehicleCompliance): boolean {
+  return c.policies.length > 0 && c.policies.every((p) => p.validUntil != null);
+}
+
+function mergeComplianceIssues(fabric: VehicleCompliance, enriched: VehicleCompliance): string[] {
+  const set = new Set([...fabric.complianceIssues, ...enriched.complianceIssues]);
+  return [...set];
 }
 
 /** Fabric + uzupełnienie brakujących pól (ubezpieczenia, badanie, przebieg) na stagingu. */
@@ -163,12 +166,27 @@ export function resolveVehicleCompliance(
 ): VehicleCompliance {
   const fabric = extractVehicleCompliance(row, registration, entity);
   if (!STAGING_COMPLIANCE_ENRICH_ENABLED || !registration.trim()) return fabric;
-  if (complianceHasFabricData(fabric)) return fabric;
 
   const enriched = getDemoFleetCompliance(registration);
+  const usePolicies = policiesComplete(fabric) ? fabric.policies : enriched.policies;
+  const useInspection = fabric.inspectionValidUntil
+    ? fabric.inspectionValidUntil
+    : enriched.inspectionValidUntil;
+  const inspectionStatus = fabric.inspectionValidUntil
+    ? fabric.inspectionStatus
+    : enriched.inspectionStatus;
+
+  const usedEnriched =
+    !policiesComplete(fabric) || !fabric.inspectionValidUntil || fabric.mileageKm == null;
+
   return {
-    ...enriched,
     mileageKm: fabric.mileageKm ?? enriched.mileageKm,
     mileageSource: fabric.mileageKm != null ? 'fabric' : enriched.mileageSource,
+    inspectionValidUntil: useInspection,
+    inspectionStatus,
+    policies: usePolicies,
+    complianceIssues: usedEnriched
+      ? mergeComplianceIssues(fabric, enriched)
+      : fabric.complianceIssues,
   };
 }
