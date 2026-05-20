@@ -401,9 +401,14 @@ export default function App() {
   );
 
   const dashboardRegionFuel = useMemo(() => {
-    if (!dashboardFilters.area) return regionFuelRows;
-    return regionFuelRows.filter((r) => r.region === dashboardFilters.area);
-  }, [regionFuelRows, dashboardFilters.area]);
+    const cat = dashboardFilters.category;
+    if (cat && cat !== 'Paliwo') return [];
+    const rows =
+      !dashboardFilters.area
+        ? regionFuelRows
+        : regionFuelRows.filter((r) => r.region === dashboardFilters.area);
+    return rows;
+  }, [regionFuelRows, dashboardFilters.area, dashboardFilters.category]);
 
   const dashboardData = useMemo(() => {
     if (!periodFilteredPoc.length && !enrichedVehicles.length) return null;

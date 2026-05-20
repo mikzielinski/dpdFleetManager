@@ -1,7 +1,7 @@
 import type { DashboardData } from '../services/dashboardAnalytics';
 import type { RegionFuelRow } from '../services/regionFuelAnalytics';
 import type { DashboardFilterState } from '../utils/dashboardFilters';
-import { planDashboardView } from '../utils/dashboardView';
+import { planDashboardView, showFuelChart } from '../utils/dashboardView';
 import { isPeriodFilterActive, type PeriodFilterState } from '../utils/periodFilter';
 import {
   categorySegments,
@@ -91,6 +91,8 @@ export function DashboardSection({
   }
 
   const plan = planDashboardView(filters, data);
+  const fuelVisible = showFuelChart(filters.category) && data.fuelRegions.length > 0;
+  const categoryScoped = filters.category !== '';
   const { stats } = data;
   const serviceRows = stats.byService.slice(0, 8).map((s) => ({
     name: s.name,
@@ -143,7 +145,7 @@ export function DashboardSection({
       </div>
 
       <div className="dashboard-grid">
-        {plan.showCategory && plan.categoryKind === 'donut' && (
+        {!categoryScoped && plan.showCategory && plan.categoryKind === 'donut' && (
           <div className="dash-chart-wide">
             <DonutChart
               title="Udział kosztów wg kategorii"
@@ -152,7 +154,7 @@ export function DashboardSection({
             />
           </div>
         )}
-        {plan.showCategory && plan.categoryKind === 'bars' && (
+        {!categoryScoped && plan.showCategory && plan.categoryKind === 'bars' && (
           <RankBarChart
             title="Koszty wg kategorii"
             rows={stats.byCategory.map((c) => ({
@@ -222,14 +224,14 @@ export function DashboardSection({
           <RankBarChart title="Top pojazdy (koszt)" rows={data.topVehicles} />
         )}
 
-        {plan.showHealth && plan.healthKind === 'donut' && (
+        {!categoryScoped && plan.showHealth && plan.healthKind === 'donut' && (
           <DonutChart
             title="Health score floty"
             segments={healthSegments(data.healthBuckets)}
             valueSuffix="pojazdów"
           />
         )}
-        {plan.showHealth && plan.healthKind === 'bars' && (
+        {!categoryScoped && plan.showHealth && plan.healthKind === 'bars' && (
           <RankBarChart
             title="Rozkład health score"
             rows={data.healthBuckets.map((b) => ({ name: b.label, total: b.count, count: b.count }))}
@@ -238,14 +240,14 @@ export function DashboardSection({
           />
         )}
 
-        {plan.showDecision && plan.decisionKind === 'donut' && (
+        {!categoryScoped && plan.showDecision && plan.decisionKind === 'donut' && (
           <DonutChart
             title="Status rozliczeń"
             segments={decisionSegments(stats.byDecision)}
             valueSuffix="szt."
           />
         )}
-        {plan.showDecision && plan.decisionKind === 'bars' && (
+        {!categoryScoped && plan.showDecision && plan.decisionKind === 'bars' && (
           <RankBarChart
             title="Status rozliczeń"
             rows={stats.byDecision.map((d) => ({ name: d.label, total: d.count, count: d.count }))}
@@ -254,8 +256,8 @@ export function DashboardSection({
           />
         )}
 
-        {plan.showFuel && plan.fuelKind === 'cards' && fuelStatCards(data.fuelRegions)}
-        {plan.showFuel && plan.fuelKind === 'bars' && (
+        {fuelVisible && plan.fuelKind === 'cards' && fuelStatCards(data.fuelRegions)}
+        {fuelVisible && plan.fuelKind === 'bars' && (
           <RankBarChart
             title="Paliwo wg regionu (PLN)"
             rows={fuelAsRankRows(data.fuelRegions)}

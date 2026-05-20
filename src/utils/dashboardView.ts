@@ -60,11 +60,13 @@ export function planDashboardView(
   const decTotal = stats.byDecision.reduce((s, d) => s + d.count, 0);
   const svcCount = stats.byService.length;
 
-  const showCategory = !cat && catCount > 1;
-  const showServices =
-    svcCount > 0 && (cat !== '' || catCount <= 1);
+  const isCategoryScoped = cat !== '';
+  const showCategory = !isCategoryScoped && catCount > 1;
+  const showServices = svcCount > 0 && (isCategoryScoped || catCount <= 1);
 
-  const fuelRows = data.fuelRegions.filter((r) => r.fuelCost > 0 || r.fuelCount > 0);
+  const fuelRows = showFuelChart(cat)
+    ? data.fuelRegions.filter((r) => r.fuelCost > 0 || r.fuelCount > 0)
+    : [];
 
   return {
     showCategory,
@@ -85,9 +87,12 @@ export function planDashboardView(
     companyKind: kindForRank(data.costsByCompany.length),
     showVehicles: data.topVehicles.length > 0 && cat !== 'Ubezpieczenie',
     vehiclesKind: kindForRank(data.topVehicles.length),
-    showHealth: !cat,
-    healthKind: kindForShare(data.healthBuckets.length, data.healthBuckets.reduce((s, b) => s + b.count, 0)),
-    showDecision: decCount > 1 && !cat,
+    showHealth: !isCategoryScoped,
+    healthKind: kindForShare(
+      data.healthBuckets.length,
+      data.healthBuckets.reduce((s, b) => s + b.count, 0),
+    ),
+    showDecision: decCount > 1 && !isCategoryScoped,
     decisionKind: kindForShare(decCount, decTotal),
     showFuel: showFuelChart(cat) && fuelRows.length > 0,
     fuelKind: fuelRows.length <= 3 ? 'cards' : 'bars',
