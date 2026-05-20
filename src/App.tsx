@@ -18,8 +18,10 @@ import {
 } from './services/dataFabric';
 import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
+import { DashboardSection } from './components/DashboardSection';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
+import { SortableTh } from './components/SortableTh';
 import {
   DEFAULT_CLAIMS_FILTERS,
   filterClaimRecords,
@@ -83,6 +85,16 @@ import {
   type CompanyFilterState,
 } from './utils/companyFilters';
 import {
+  DEFAULT_DASHBOARD_FILTERS,
+  type DashboardFilterState,
+} from './utils/dashboardFilters';
+import {
+  buildDashboardData,
+  filterPocForDashboard,
+} from './services/dashboardAnalytics';
+import { getClaimSortValue } from './utils/claimSort';
+import { sortArray, toggleSort, EMPTY_SORT, type SortState } from './utils/tableSort';
+import {
   findInvoiceFileField,
   normalizeRegistration,
   pickField,
@@ -136,7 +148,15 @@ export default function App() {
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
 
-  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies'>('claims');
+  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies' | 'dashboard'>(
+    'claims',
+  );
+  const [claimsSort, setClaimsSort] = useState<SortState>(EMPTY_SORT);
+  const [vehicleSort, setVehicleSort] = useState<
+    SortState<'registration' | 'area' | 'company' | 'health' | 'cost' | 'poc'>
+  >({ key: null, direction: 'asc' });
+  const [dashboardFilters, setDashboardFilters] =
+    useState<DashboardFilterState>(DEFAULT_DASHBOARD_FILTERS);
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
   const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>(DEFAULT_VEHICLE_FILTERS);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogData | null>(null);
@@ -172,13 +192,19 @@ export default function App() {
     return filterClaimRecords(scoped, tableColumns, claimFilters);
   }, [records, periodFilter, tableColumns, claimFilters]);
 
-  const filteredPageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE) || 1);
+  const sortedFilteredRecords = useMemo(() => {
+    if (!claimsSort.key) return filteredRecords;
+    const key = claimsSort.key;
+    return sortArray(filteredRecords, claimsSort, (r) => getClaimSortValue(r, key, tableColumns));
+  }, [filteredRecords, claimsSort, tableColumns]);
+
+  const filteredPageCount = Math.max(1, Math.ceil(sortedFilteredRecords.length / PAGE_SIZE) || 1);
 
   const displayRecords = useMemo(() => {
-    if (!globalFilterActive) return filteredRecords;
+    if (!globalFilterActive) return sortedFilteredRecords;
     const start = pageIndex * PAGE_SIZE;
-    return filteredRecords.slice(start, start + PAGE_SIZE);
-  }, [globalFilterActive, filteredRecords, pageIndex]);
+    return sortedFilteredRecords.slice(start, start + PAGE_SIZE);
+  }, [globalFilterActive, sortedFilteredRecords, pageIndex]);
 
   const prevGlobalFilterRef = useRef(false);
 
@@ -284,6 +310,27 @@ export default function App() {
     );
   }, [periodFilteredPoc, vehicleCatalog, vehicleIdsByPlate]);
 
+  const sortedFilteredVehicles = useMemo(() => {
+    return sortArray(filteredVehicles, vehicleSort, (v) => {
+      switch (vehicleSort.key) {
+        case 'registration':
+          return v.registration;
+        case 'area':
+          return v.areaLabel || null;
+        case 'company':
+          return v.companyLabel || null;
+        case 'health':
+          return v.healthScore ?? null;
+        case 'cost':
+          return v.totalCost ?? null;
+        case 'poc':
+          return pocCountByVehicleId.get(v.id) ?? 0;
+        default:
+          return v.registration;
+      }
+    });
+  }, [filteredVehicles, vehicleSort, pocCountByVehicleId]);
+
   const activeVehicle = useMemo((): VehicleCatalogItem | null => {
     if (!activeVehicleId) return null;
     return enrichedVehicles.find((v) => v.id === activeVehicleId) ?? null;
@@ -347,6 +394,34 @@ export default function App() {
       periodFilter,
     );
   }, [periodFilteredPoc, pocSourceForPeriod, enrichedVehicles, periodFilter, vehicleCatalog]);
+
+  const dashboardPoc = useMemo(
+    () => filterPocForDashboard(periodFilteredPoc, enrichedVehicles, dashboardFilters),
+    [periodFilteredPoc, enrichedVehicles, dashboardFilters],
+  );
+
+  const dashboardRegionFuel = useMemo(() => {
+    if (!dashboardFilters.area) return regionFuelRows;
+    return regionFuelRows.filter((r) => r.region === dashboardFilters.area);
+  }, [regionFuelRows, dashboardFilters.area]);
+
+  const dashboardData = useMemo(() => {
+    if (!periodFilteredPoc.length && !enrichedVehicles.length) return null;
+    return buildDashboardData(
+      dashboardPoc,
+      enrichedVehicles,
+      enrichedCompanies,
+      dashboardRegionFuel,
+      tableColumns,
+    );
+  }, [
+    dashboardPoc,
+    enrichedVehicles,
+    enrichedCompanies,
+    dashboardRegionFuel,
+    tableColumns,
+    periodFilteredPoc.length,
+  ]);
 
   const activeVehicleFuelStats = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return null;
@@ -439,6 +514,10 @@ export default function App() {
     if (globalFilterActive) setPageIndex(0);
   }, [claimFilters, globalFilterActive, periodFilter]);
 
+  useEffect(() => {
+    setPageIndex(0);
+  }, [claimsSort]);
+
   const loadVehicleTabData = useCallback(async () => {
     if (!isAuthenticated) return;
     setVehicleCatalogLoading(true);
@@ -484,7 +563,7 @@ export default function App() {
   }, [periodFilterActive, isAuthenticated, ensurePocCostsLoaded]);
 
   useEffect(() => {
-    if (mainSection !== 'vehicles' || !isAuthenticated) return;
+    if ((mainSection !== 'vehicles' && mainSection !== 'dashboard') || !isAuthenticated) return;
     if (vehicleCatalog || vehicleCatalogLoading) return;
     void loadVehicleTabData();
   }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
@@ -523,8 +602,8 @@ export default function App() {
   }, [sdk, isAuthenticated, vehicleCatalog]);
 
   useEffect(() => {
-    if (mainSection !== 'companies' || !isAuthenticated) return;
-    if (companyCatalog || companyCatalogLoading) return;
+    if (mainSection !== 'companies' && mainSection !== 'dashboard') return;
+    if (!isAuthenticated || companyCatalog || companyCatalogLoading) return;
     void loadCompanyTabData();
   }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
 
@@ -835,6 +914,13 @@ export default function App() {
         </button>
         <button
           type="button"
+          className={mainSection === 'dashboard' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
           className="main-nav-btn main-nav-btn-report"
           title="Podsumowanie floty PDF"
           onClick={() => {
@@ -857,6 +943,8 @@ export default function App() {
         onVehicleFiltersChange={setVehicleFilters}
         companyFilters={companyFilters}
         onCompanyFiltersChange={setCompanyFilters}
+        dashboardFilters={dashboardFilters}
+        onDashboardFiltersChange={setDashboardFilters}
         areaOptions={vehicleCatalog?.areaOptions ?? []}
         companyAreaOptions={companyCatalog?.areaOptions ?? []}
         vehicleCompanyOptions={vehicleCatalog?.companyOptions ?? []}
@@ -864,10 +952,12 @@ export default function App() {
         decisionOptions={decisionOptions}
         filteredCount={
           mainSection === 'claims'
-            ? filteredRecords.length
+            ? sortedFilteredRecords.length
             : mainSection === 'vehicles'
-              ? filteredVehicles.length
-              : filteredCompanies.length
+              ? sortedFilteredVehicles.length
+              : mainSection === 'dashboard'
+                ? dashboardPoc.length
+                : filteredCompanies.length
         }
         totalCount={
           mainSection === 'claims'
@@ -886,6 +976,7 @@ export default function App() {
           setClaimFilters(DEFAULT_CLAIMS_FILTERS);
           setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
           setCompanyFilters(DEFAULT_COMPANY_FILTERS);
+          setDashboardFilters(DEFAULT_DASHBOARD_FILTERS);
           setPeriodFilter(DEFAULT_PERIOD_FILTER);
         }}
       />
@@ -942,7 +1033,16 @@ export default function App() {
                         />
                       </th>
                       {tableColumns.map((c) => (
-                        <th key={c.key}>{c.label}</th>
+                        <SortableTh
+                          key={c.key}
+                          label={c.label}
+                          sortKey={c.key}
+                          sort={claimsSort}
+                          onSort={(key) => setClaimsSort((s) => toggleSort(s, key))}
+                          className={
+                            c.key === 'netPrice' || c.key === 'amount' ? 'col-numeric' : undefined
+                          }
+                        />
                       ))}
                     </tr>
                   </thead>
@@ -955,7 +1055,7 @@ export default function App() {
                             : 'Ładowanie…'}
                         </td>
                       </tr>
-                    ) : filteredRecords.length === 0 ? (
+                    ) : sortedFilteredRecords.length === 0 ? (
                       <tr>
                         <td colSpan={tableColumns.length + 1} className="center">
                           {records.length === 0
@@ -1012,8 +1112,8 @@ export default function App() {
                 </button>
                 <span>
                   Strona {pageIndex + 1}
-                  {globalFilterActive && filteredRecords.length > 0
-                    ? ` z ${filteredPageCount} (${filteredRecords.length} pasujących)`
+                  {globalFilterActive && sortedFilteredRecords.length > 0
+                    ? ` z ${filteredPageCount} (${sortedFilteredRecords.length} pasujących)`
                     : ''}
                 </span>
                 <button
@@ -1171,12 +1271,45 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Pojazd</th>
-                      <th>Region / miasto</th>
-                      <th>Firma kurierska</th>
-                      <th className="col-numeric">Health</th>
-                      <th className="col-numeric">Koszty</th>
-                      <th className="col-numeric">POC</th>
+                      <SortableTh
+                        label="Pojazd"
+                        sortKey="registration"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                      />
+                      <SortableTh
+                        label="Region / miasto"
+                        sortKey="area"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                      />
+                      <SortableTh
+                        label="Firma kurierska"
+                        sortKey="company"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                      />
+                      <SortableTh
+                        label="Health"
+                        sortKey="health"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                        className="col-numeric"
+                      />
+                      <SortableTh
+                        label="Koszty"
+                        sortKey="cost"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                        className="col-numeric"
+                      />
+                      <SortableTh
+                        label="POC"
+                        sortKey="poc"
+                        sort={vehicleSort}
+                        onSort={(key) => setVehicleSort((s) => toggleSort(s, key))}
+                        className="col-numeric"
+                      />
                     </tr>
                   </thead>
                   <tbody>
@@ -1186,7 +1319,7 @@ export default function App() {
                           Ładowanie pojazdów i słowników regionów / firm…
                         </td>
                       </tr>
-                    ) : filteredVehicles.length === 0 ? (
+                    ) : sortedFilteredVehicles.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="center">
                           {vehicleCatalog
@@ -1195,7 +1328,7 @@ export default function App() {
                         </td>
                       </tr>
                     ) : (
-                      filteredVehicles.map((v) => {
+                      sortedFilteredVehicles.map((v) => {
                         const pocCount = pocCountByVehicleId.get(v.id) ?? 0;
                         const selectedV = activeVehicleId === v.id;
                         return (
@@ -1357,6 +1490,14 @@ export default function App() {
               )}
             </section>
           </div>
+        ) : mainSection === 'dashboard' ? (
+          <DashboardSection
+            data={dashboardData}
+            loading={vehicleCatalogLoading || companyCatalogLoading}
+            period={periodFilter}
+            vehicleCount={vehicleCatalog?.totalVehicles ?? enrichedVehicles.length}
+            companyCount={companyCatalog?.totalCompanies ?? enrichedCompanies.length}
+          />
         ) : (
           <CompaniesSection
             catalog={companyCatalog}

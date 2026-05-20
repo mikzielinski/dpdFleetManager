@@ -1,10 +1,13 @@
 import type { CompanyFilterState } from '../utils/companyFilters';
+import type { DashboardFilterState } from '../utils/dashboardFilters';
+import { isDashboardFilterActive } from '../utils/dashboardFilters';
 import type { ClaimsFilterState } from '../utils/filterRecords';
+import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 import type { VehicleFilterState } from '../utils/vehicleFilters';
 import { PeriodFilterRow } from './PeriodFilterRow';
 import { isPeriodFilterActive, type PeriodFilterState } from '../utils/periodFilter';
 
-type MainSection = 'claims' | 'vehicles' | 'companies';
+type MainSection = 'claims' | 'vehicles' | 'companies' | 'dashboard';
 
 interface Props {
   section: MainSection;
@@ -14,6 +17,8 @@ interface Props {
   onVehicleFiltersChange: (next: VehicleFilterState) => void;
   companyFilters: CompanyFilterState;
   onCompanyFiltersChange: (next: CompanyFilterState) => void;
+  dashboardFilters?: DashboardFilterState;
+  onDashboardFiltersChange?: (next: DashboardFilterState) => void;
   areaOptions: string[];
   companyAreaOptions: string[];
   vehicleCompanyOptions: string[];
@@ -39,6 +44,8 @@ export function GlobalFilterBar({
   onVehicleFiltersChange,
   companyFilters,
   onCompanyFiltersChange,
+  dashboardFilters,
+  onDashboardFiltersChange,
   areaOptions,
   companyAreaOptions,
   vehicleCompanyOptions,
@@ -60,6 +67,11 @@ export function GlobalFilterBar({
     onVehicleFiltersChange({ ...vehicleFilters, ...partial });
   const patchCompany = (partial: Partial<CompanyFilterState>) =>
     onCompanyFiltersChange({ ...companyFilters, ...partial });
+  const patchDashboard = (partial: Partial<DashboardFilterState>) => {
+    if (dashboardFilters && onDashboardFiltersChange) {
+      onDashboardFiltersChange({ ...dashboardFilters, ...partial });
+    }
+  };
 
   const hasActiveCompanyFilters =
     companyFilters.query.trim() !== '' || companyFilters.area !== '';
@@ -79,6 +91,9 @@ export function GlobalFilterBar({
 
   const hasActivePeriod = isPeriodFilterActive(period);
 
+  const hasActiveDashboardFilters =
+    dashboardFilters != null && isDashboardFilterActive(dashboardFilters);
+
   return (
     <div className="global-filter-bar" role="search" aria-label="Wyszukiwanie i filtry">
       <PeriodFilterRow
@@ -95,7 +110,9 @@ export function GlobalFilterBar({
             ? hasActiveClaimsFilters
             : section === 'vehicles'
               ? hasActiveVehicleFilters
-              : hasActiveCompanyFilters)) && (
+              : section === 'dashboard'
+                ? hasActiveDashboardFilters
+                : hasActiveCompanyFilters)) && (
           <button type="button" className="btn btn-link-reset" onClick={onReset}>
             Wyczyść
           </button>
@@ -116,6 +133,11 @@ export function GlobalFilterBar({
               {' '}
               z <strong>{totalCount}</strong> pojazdów B2B
             </>
+          ) : section === 'dashboard' ? (
+            <>
+              {' '}
+              · <strong>{filteredCount}</strong> rozliczeń w wykresach
+            </>
           ) : section === 'companies' ? (
             <>
               {' '}
@@ -132,7 +154,63 @@ export function GlobalFilterBar({
         </span>
       </div>
 
-      {section === 'companies' ? (
+      {section === 'dashboard' && dashboardFilters && onDashboardFiltersChange ? (
+        <div className="global-filter-controls">
+          <label className="filter-field">
+            <span className="filter-label">Region</span>
+            <select
+              value={dashboardFilters.area}
+              onChange={(e) => patchDashboard({ area: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {areaOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="filter-field">
+            <span className="filter-label">Firma kurierska</span>
+            <select
+              value={dashboardFilters.company}
+              onChange={(e) => patchDashboard({ company: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {vehicleCompanyOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="filter-field">
+            <span className="filter-label">Kategoria usługi</span>
+            <select
+              value={dashboardFilters.category}
+              onChange={(e) =>
+                patchDashboard({
+                  category: e.target.value as DashboardFilterState['category'],
+                })
+              }
+            >
+              <option value="">Wszystkie</option>
+              {SERVICE_CATEGORIES.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="filter-hint">
+            Dashboard: wykresy z DPD_POC w okresie z slicera powyżej. Filtry zawężają zestaw przed
+            agregacją.
+          </p>
+        </div>
+      ) : section === 'companies' ? (
         <div className="global-filter-controls">
           <label className="filter-field filter-grow">
             <span className="filter-label">Szukaj firmy</span>
