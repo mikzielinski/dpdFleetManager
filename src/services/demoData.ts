@@ -1,8 +1,19 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
 import type { PaginationCursor } from '@uipath/uipath-typescript/core';
 import { DPD_POC_ENTITY_ID, TABLE_COLUMNS } from '../config';
+import { appendDemoPocBoost, type PocBoostVehicle } from '../data/demoStagingPoc';
 import type { DpdRecord } from '../utils/record';
 export const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true';
+
+/** Pojazdy zgodne z mockVehicleCatalog — do boost POC w trybie BYPASS. */
+const BYPASS_DEMO_VEHICLES: PocBoostVehicle[] = [
+  { registration: 'WR145DPD' },
+  { registration: 'WR136DPD' },
+  { registration: 'DW7855U' },
+  { registration: 'DW2048O' },
+  { registration: 'DW2905K' },
+  { registration: 'WR117DPD' },
+];
 
 export interface DemoAnalysisVariables {
   recordId?: string;
@@ -169,6 +180,37 @@ const MOCK_RECORDS: DpdRecord[] = [
     combinedScore: '6',
   },
   {
+    Id: 'demo-wr145-fraud',
+    CarRegistration: 'WR145DPD',
+    ServiceName: 'Vehicle Repair',
+    ServiceType: 'Vehicle Repair',
+    CompanyName: 'Auto Serwis Wrocław',
+    TaxID: '8990001451',
+    NetPrice: 4850,
+    Amount: 1,
+    Status: 'Flagged',
+    decision: 'Flagged',
+    FlagType: 'Kwota 4× powyżej mediany floty',
+    FraudFlag: 'true',
+    fleetManagerNote: 'Podejrzana faktura — duplikat NIP w 14 dni.',
+  },
+  {
+    Id: 'demo-dw7855-mot',
+    CarRegistration: 'DW7855U',
+    ServiceName: 'Vehicle Inspection',
+    CompanyName: 'SKP Wrocław Południe',
+    NetPrice: 189,
+    decision: 'Zatwierdzono',
+  },
+  {
+    Id: 'demo-dw2048-ins',
+    CarRegistration: 'DW2048O',
+    ServiceName: 'Fuel Expense',
+    CompanyName: 'Circle K',
+    NetPrice: 310,
+    decision: 'Oczekuje',
+  },
+  {
     Id: 'demo-010',
     carRegistration: 'WR 11223',
     serviceName: 'AdBlue',
@@ -218,7 +260,8 @@ const MOCK_RECORDS: DpdRecord[] = [
 ];
 
 export function getAllMockRecords(): DpdRecord[] {
-  return MOCK_RECORDS.map((r) => ({ ...r }));
+  const base = MOCK_RECORDS.map((r) => ({ ...r }));
+  return appendDemoPocBoost(BYPASS_DEMO_VEHICLES, base);
 }
 
 export function getMockRecordById(id: string): DpdRecord | undefined {
