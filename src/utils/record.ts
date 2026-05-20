@@ -162,6 +162,41 @@ export function pickField(r: DpdRecord, ...keys: string[]): string {
   return '—';
 }
 
+/** Map ChoiceSet raw value (number, string, expanded object) to display label. */
+export function resolveChoiceSetLabel(
+  raw: unknown,
+  map?: Map<number, string>,
+): string | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>;
+    const dn = o.displayName ?? o.DisplayName ?? o.name ?? o.Name;
+    if (typeof dn === 'string' && dn.trim()) return dn.trim();
+    const nid = o.numberId ?? o.NumberId ?? o.value ?? o.Value;
+    if (map && nid !== undefined && nid !== null) {
+      const fromId = resolveChoiceSetLabel(nid, map);
+      if (fromId) return fromId;
+    }
+  }
+
+  if (map) {
+    if (typeof raw === 'number' && map.has(raw)) return map.get(raw);
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      const asNum = Number(trimmed);
+      if (trimmed !== '' && Number.isInteger(asNum) && map.has(asNum)) return map.get(asNum);
+      for (const label of map.values()) {
+        if (label.toLowerCase() === trimmed.toLowerCase()) return label;
+      }
+    }
+  }
+
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  if (typeof raw === 'number' && !map?.has(raw)) return String(raw);
+  return undefined;
+}
+
 export function formatValue(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'boolean') return v ? 'Tak' : 'Nie';

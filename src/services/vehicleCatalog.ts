@@ -158,20 +158,53 @@ function buildCompanyCatalogHints(ctx: PocEnrichmentContext): Map<string, { comp
   for (const row of ctx.companyRows) {
     const companyLabel = blankLabel(pickRecordLabel(row, COMPANY_LABEL_FIELDS));
     if (!companyLabel) continue;
-    const areaLabel = blankLabel(
-      resolveRelationshipLabel(
-        row,
-        ctx.companiesEntity,
-        areaNames.filter(Boolean) as string[],
-        AREA_LABEL_FIELDS,
-        AREA_REF_FIELDS,
-        AREA_INLINE_FIELDS,
-        ctx.areaMap,
-      ),
+    const fromRel = resolveRelationshipLabel(
+      row,
+      ctx.companiesEntity,
+      areaNames.filter(Boolean) as string[],
+      AREA_LABEL_FIELDS,
+      AREA_REF_FIELDS,
+      AREA_INLINE_FIELDS,
+      ctx.areaMap,
     );
+    const fromInline = pickRecordLabel(row, AREA_INLINE_FIELDS);
+    const areaLabel = blankLabel(fromRel !== '—' ? fromRel : fromInline);
     hints.set(normalizeHintKey(companyLabel), { companyLabel, areaLabel });
   }
   return hints;
+}
+
+function findCompanyRow(companyLabel: string, rows: DpdRecord[]): DpdRecord | null {
+  const key = normalizeHintKey(companyLabel);
+  for (const row of rows) {
+    const label = blankLabel(pickRecordLabel(row, COMPANY_LABEL_FIELDS));
+    if (!label) continue;
+    if (normalizeHintKey(label) === key) return row;
+  }
+  for (const row of rows) {
+    const label = blankLabel(pickRecordLabel(row, COMPANY_LABEL_FIELDS));
+    if (!label) continue;
+    const lk = normalizeHintKey(label);
+    if (lk.includes(key) || key.includes(lk)) return row;
+  }
+  return null;
+}
+
+function areaLabelFromCompanyRow(row: DpdRecord, ctx: PocEnrichmentContext): string {
+  const areaNames = ctx.areasEntity
+    ? [ctx.areasEntity.name, ctx.areasEntity.displayName, ...ctx.areaNames]
+    : ctx.areaNames;
+  const fromRel = resolveRelationshipLabel(
+    row,
+    ctx.companiesEntity,
+    areaNames.filter(Boolean) as string[],
+    AREA_LABEL_FIELDS,
+    AREA_REF_FIELDS,
+    AREA_INLINE_FIELDS,
+    ctx.areaMap,
+  );
+  const fromInline = pickRecordLabel(row, AREA_INLINE_FIELDS);
+  return blankLabel(fromRel !== '—' ? fromRel : fromInline);
 }
 
 /** Najczęstsza firma / region z kosztów DPD_POC dla danej rejestracji. */
@@ -215,13 +248,19 @@ function buildPocHintsByPlate(costs: DpdRecord[]): Map<
 function resolveAreaFromCompanyName(
   companyLabel: string,
   catalogHints: Map<string, { companyLabel: string; areaLabel: string }>,
+  companyRows: DpdRecord[],
+  ctx: PocEnrichmentContext,
 ): string {
   if (!companyLabel.trim()) return '';
   const key = normalizeHintKey(companyLabel);
-  if (catalogHints.has(key)) return catalogHints.get(key)!.areaLabel;
-  for (const [k, v] of catalogHints) {
-    if (k.includes(key) || key.includes(k)) return v.areaLabel;
+  if (catalogHints.has(key) && catalogHints.get(key)!.areaLabel) {
+    return catalogHints.get(key)!.areaLabel;
   }
+  for (const [k, v] of catalogHints) {
+    if ((k.includes(key) || key.includes(k)) && v.areaLabel) return v.areaLabel;
+  }
+  const row = findCompanyRow(companyLabel, companyRows);
+  if (row) return areaLabelFromCompanyRow(row, ctx);
   return '';
 }
 
@@ -251,7 +290,16 @@ export function applyPocEnrichment(
     }
     if (!areaLabel && poc?.area) areaLabel = poc.area;
     if (!areaLabel && companyLabel) {
-      areaLabel = resolveAreaFromCompanyName(companyLabel, companyCatalog);
+      areaLabel = resolveAreaFromCompanyName(
+        companyLabel,
+        companyCatalog,
+        ctx.companyRows,
+        ctx,
+      );
+    }
+    if (!areaLabel && /^WR/i.test(v.registration)) {
+      const wroclawAreas = [...ctx.areaMap.values()].filter((a) => /wrocław/i.test(a));
+      if (wroclawAreas.length) areaLabel = wroclawAreas[0];
     }
 
     return { ...v, companyLabel, areaLabel };

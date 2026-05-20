@@ -18,6 +18,7 @@ import {
   pickVehicleFlagField,
   recordId,
   registrationsMatch,
+  resolveChoiceSetLabel,
   resolveRecordField,
   type DpdRecord,
 } from '../utils/record';
@@ -131,10 +132,23 @@ export function translateRecord(
   choiceMaps: Map<string, Map<number, string>>,
 ): DpdRecord {
   const out = normalizeDpdRecord(record);
-  for (const [field, map] of choiceMaps) {
-    const raw = out[field];
-    if (typeof raw === 'number' && map.has(raw)) {
-      out[`_${field}Label`] = map.get(raw);
+  const seenMaps = new Set<Map<number, string>>();
+
+  for (const [fieldKey, map] of choiceMaps) {
+    if (seenMaps.has(map)) continue;
+    seenMaps.add(map);
+
+    const columnKey =
+      fieldKey === 'Status' ? 'decision' : fieldKey.charAt(0).toLowerCase() + fieldKey.slice(1);
+    const raw = resolveRecordField(out, fieldKey, columnKey);
+    const label = resolveChoiceSetLabel(raw, map);
+    if (!label) continue;
+
+    out[`_${fieldKey}Label`] = label;
+    if (columnKey !== fieldKey) out[`_${columnKey}Label`] = label;
+    if (fieldKey === 'Status') {
+      out.decision = label;
+      out.status = label;
     }
   }
   return out;
@@ -159,7 +173,7 @@ export async function fetchRecordsPage(
   const result = await entities.getAllRecords(DPD_POC_ENTITY_ID, {
     pageSize,
     cursor,
-    expansionLevel: 1,
+    expansionLevel: 2,
   });
 
   const page = normalizeRecordsPage(result, pageSize);
