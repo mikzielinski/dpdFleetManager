@@ -1,7 +1,7 @@
 /**
  * Staging deploy (Node) — mirrors .uipath/deploy-dpdmonitoring.ps1
  * Requires: uip login --authority https://staging.uipath.com/identity_ ...
- * Usage: node scripts/deploy-staging.mjs [semver]  (default 1.1.1)
+ * Usage: node scripts/deploy-staging.mjs [semver]  (default 1.1.2)
  */
 import { execSync } from 'child_process';
 import fs from 'fs';

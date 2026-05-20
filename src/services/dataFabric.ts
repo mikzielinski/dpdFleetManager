@@ -24,6 +24,7 @@ import {
 import {
   BYPASS_AUTH,
   DEMO_INVOICE_PDF,
+  getAllMockRecords,
   getMockRecordById,
   mockEntityContext,
   parseDemoCursor,
@@ -291,6 +292,21 @@ export interface VehicleFlagHistoryItem {
   aiConfidenceScore: string;
   relatedCostRecordId: string;
   raw: DpdRecord;
+}
+
+/** Load all DPD_POC rows (paginated API walk). Use for global in-app filters. */
+export async function fetchAllDpdRecords(sdk: UiPath): Promise<{
+  items: DpdRecord[];
+  totalCount: number;
+}> {
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    const items = getAllMockRecords();
+    return { items, totalCount: items.length };
+  }
+
+  const items = await fetchAllEntityRecords(sdk, DPD_POC_ENTITY_ID);
+  return { items, totalCount: items.length };
 }
 
 async function fetchAllEntityRecords(sdk: UiPath, entityId: string): Promise<DpdRecord[]> {

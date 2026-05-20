@@ -6,6 +6,7 @@ import { ORCHESTRATOR_RELEASE_NAME, PAGE_SIZE, TABLE_COLUMNS, type TableColumn }
 import {
   displayField,
   downloadInvoiceBlob,
+  fetchAllDpdRecords,
   fetchRecordById,
   fetchRecordsPage,
   fetchVehicleFlagHistory,
@@ -20,6 +21,7 @@ import {
   DEFAULT_CLAIMS_FILTERS,
   filterClaimRecords,
   getRecordNumericAmount,
+  needsFullDatasetFilters,
   type ClaimsFilterState,
 } from './utils/filterRecords';
 import {
@@ -95,10 +97,25 @@ export default function App() {
 
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
 
+  const globalFilterActive = useMemo(
+    () => needsFullDatasetFilters(claimFilters),
+    [claimFilters],
+  );
+
   const filteredRecords = useMemo(
     () => filterClaimRecords(records, tableColumns, claimFilters),
     [records, tableColumns, claimFilters],
   );
+
+  const filteredPageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE) || 1);
+
+  const displayRecords = useMemo(() => {
+    if (!globalFilterActive) return filteredRecords;
+    const start = pageIndex * PAGE_SIZE;
+    return filteredRecords.slice(start, start + PAGE_SIZE);
+  }, [globalFilterActive, filteredRecords, pageIndex]);
+
+  const prevGlobalFilterRef = useRef(false);
 
   const serviceOptions = useMemo(() => {
     const col = tableColumns.find((c) => c.key === 'serviceName');
@@ -182,6 +199,40 @@ export default function App() {
     },
     [sdk, isAuthenticated],
   );
+
+  const loadAllForFilters = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingTable(true);
+    setTableError(null);
+    try {
+      const all = await fetchAllDpdRecords(sdk);
+      const maps = ctxRef.current?.choiceMaps ?? new Map();
+      setRecords(all.items.map((r) => translateRecord(r, maps)));
+      setRecordTotal(all.totalCount);
+      setHasNext(false);
+      setCursor(undefined);
+      setCursorStack([]);
+      setPageIndex(0);
+    } catch (e) {
+      setTableError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingTable(false);
+    }
+  }, [sdk, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (globalFilterActive) {
+      void loadAllForFilters();
+    } else if (prevGlobalFilterRef.current) {
+      void loadPage(undefined, true);
+    }
+    prevGlobalFilterRef.current = globalFilterActive;
+  }, [globalFilterActive, isAuthenticated, loadAllForFilters, loadPage]);
+
+  useEffect(() => {
+    if (globalFilterActive) setPageIndex(0);
+  }, [claimFilters, globalFilterActive]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -273,7 +324,7 @@ export default function App() {
   };
 
   const toggleSelectAllPage = () => {
-    const pageIds = filteredRecords.map((r) => recordId(r)).filter(Boolean);
+    const pageIds = displayRecords.map((r) => recordId(r)).filter(Boolean);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -482,6 +533,8 @@ export default function App() {
           mainSection === 'claims' ? filteredRecords.length : filteredVehicleGroups.length
         }
         totalCount={mainSection === 'claims' ? records.length : vehicleGroups.length}
+        globalFilterActive={mainSection === 'claims' && globalFilterActive}
+        datasetTotal={recordTotal}
         onReset={() => {
           setClaimFilters(DEFAULT_CLAIMS_FILTERS);
           setVehicleSearch('');
@@ -515,7 +568,9 @@ export default function App() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => void loadPage(undefined, true)}
+                  onClick={() =>
+                    void (globalFilterActive ? loadAllForFilters() : loadPage(undefined, true))
+                  }
                 >
                   Odśwież zgłoszenia ({recordTotal ?? records.length})
                 </button>
@@ -531,8 +586,8 @@ export default function App() {
                         <input
                           type="checkbox"
                           checked={
-                            filteredRecords.length > 0 &&
-                            filteredRecords.every((r) => selectedIds.has(recordId(r)))
+                            displayRecords.length > 0 &&
+                            displayRecords.every((r) => selectedIds.has(recordId(r)))
                           }
                           onChange={toggleSelectAllPage}
                         />
@@ -546,19 +601,23 @@ export default function App() {
                     {loadingTable ? (
                       <tr>
                         <td colSpan={tableColumns.length + 1} className="center">
-                          Ładowanie…
+                          {globalFilterActive
+                            ? 'Ładowanie wszystkich zgłoszeń…'
+                            : 'Ładowanie…'}
                         </td>
                       </tr>
                     ) : filteredRecords.length === 0 ? (
                       <tr>
                         <td colSpan={tableColumns.length + 1} className="center">
                           {records.length === 0
-                            ? 'Brak zgłoszeń na tej stronie.'
-                            : `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`}
+                            ? 'Brak zgłoszeń.'
+                            : globalFilterActive
+                              ? `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
+                              : `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`}
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((r) => {
+                      displayRecords.map((r) => {
                         const id = recordId(r);
                         const selected = id === activeId;
                         return (
@@ -590,6 +649,10 @@ export default function App() {
                   type="button"
                   disabled={pageIndex === 0}
                   onClick={() => {
+                    if (globalFilterActive) {
+                      setPageIndex((p) => Math.max(0, p - 1));
+                      return;
+                    }
                     const prev = cursorStack[cursorStack.length - 1];
                     setCursorStack((s) => s.slice(0, -1));
                     setPageIndex((p) => Math.max(0, p - 1));
@@ -598,11 +661,20 @@ export default function App() {
                 >
                   ← Poprzednia
                 </button>
-                <span>Strona {pageIndex + 1}</span>
+                <span>
+                  Strona {pageIndex + 1}
+                  {globalFilterActive && filteredRecords.length > 0
+                    ? ` z ${filteredPageCount} (${filteredRecords.length} pasujących)`
+                    : ''}
+                </span>
                 <button
                   type="button"
-                  disabled={!hasNext}
+                  disabled={globalFilterActive ? pageIndex >= filteredPageCount - 1 : !hasNext}
                   onClick={() => {
+                    if (globalFilterActive) {
+                      setPageIndex((p) => p + 1);
+                      return;
+                    }
                     setCursorStack((s) => [...s, cursor!]);
                     setPageIndex((p) => p + 1);
                     void loadPage(cursor);

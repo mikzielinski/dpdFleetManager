@@ -12,6 +12,9 @@ interface Props {
   decisionOptions: string[];
   filteredCount: number;
   totalCount: number;
+  /** When true, filters run on full dataset loaded from API (not one page). */
+  globalFilterActive?: boolean;
+  datasetTotal?: number | null;
   onReset: () => void;
 }
 
@@ -25,6 +28,8 @@ export function GlobalFilterBar({
   decisionOptions,
   filteredCount,
   totalCount,
+  globalFilterActive = false,
+  datasetTotal = null,
   onReset,
 }: Props) {
   const patch = (partial: Partial<ClaimsFilterState>) =>
@@ -48,8 +53,17 @@ export function GlobalFilterBar({
           </button>
         )}
         <span className="global-filter-count">
-          Widoczne: <strong>{filteredCount}</strong>
-          {totalCount !== filteredCount ? (
+          Pasujące: <strong>{filteredCount}</strong>
+          {globalFilterActive ? (
+            <>
+              {' '}
+              (przeszukano <strong>{totalCount}</strong>
+              {datasetTotal != null && datasetTotal !== totalCount ? (
+                <> z {datasetTotal} w bazie</>
+              ) : null}
+              )
+            </>
+          ) : totalCount !== filteredCount ? (
             <>
               {' '}
               z <strong>{totalCount}</strong> na stronie

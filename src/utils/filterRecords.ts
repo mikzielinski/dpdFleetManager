@@ -35,12 +35,31 @@ export function getRecordNumericAmount(r: DpdRecord): number | null {
   return parseNumLoose(pickField(r, 'amount'));
 }
 
-function isLikelyFlagged(r: DpdRecord): boolean {
+/** True when record is flagged / anomaly (Status, flag fields, or anomaly reason). */
+export function isLikelyFlagged(r: DpdRecord, tableColumns?: TableColumn[]): boolean {
+  const decCol = tableColumns?.find((c) => c.key === 'decision');
+  const status = decCol ? displayField(r, decCol) : pickField(r, 'decision', 'Status', 'status');
+  if (status && status !== '—' && /flagged|flag|anomal/i.test(status)) return true;
+
   const ft = pickField(r, 'flagType');
-  const ar = pickField(r, 'anomalyReason');
   if (ft && ft !== '—') return true;
-  if (ar && ar !== '—') return true;
+
+  const ar = pickField(r, 'anomalyReason');
+  if (ar && ar !== '—' && (ar === 'true' || ar === 'Tak' || /anomal/i.test(ar))) return true;
+
   return false;
+}
+
+/** Filters that must scan the full entity, not only the current API page. */
+export function needsFullDatasetFilters(filters: ClaimsFilterState): boolean {
+  return (
+    filters.flaggedOnly ||
+    filters.query.trim() !== '' ||
+    filters.serviceName !== '' ||
+    filters.decision !== '' ||
+    filters.amountMin.trim() !== '' ||
+    filters.amountMax.trim() !== ''
+  );
 }
 
 function rowSearchBlob(record: DpdRecord, tableColumns: TableColumn[]): string {
@@ -61,7 +80,7 @@ export function filterClaimRecords(
   const q = filters.query.trim().toLowerCase();
 
   return items.filter((r) => {
-    if (filters.flaggedOnly && !isLikelyFlagged(r)) return false;
+    if (filters.flaggedOnly && !isLikelyFlagged(r, tableColumns)) return false;
 
     if (filters.serviceName) {
       const svcCol = tableColumns.find((c) => c.key === 'serviceName');
