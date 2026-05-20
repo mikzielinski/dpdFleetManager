@@ -1290,3 +1290,134 @@ tbody tr:hover {
   font-weight: 600;
   color: #333;
 }
+
+.dash-bar-fuel {
+  background: #e85d04;
+}
+
+.dash-chart-highlight {
+  background: #fff8f0;
+  border-color: #f4d4a8;
+}
+
+.dash-single-cat {
+  margin: 0;
+  font-size: 14px;
+  color: #444;
+}
+
+.dash-donut-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.dash-donut {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-donut-hole {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px #e8e8e6;
+}
+
+.dash-donut-total {
+  font-size: 13px;
+  font-weight: 800;
+  color: #333;
+  line-height: 1.2;
+}
+
+.dash-donut-total-label {
+  font-size: 9px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.dash-donut-legend {
+  list-style: none;
+  flex: 1;
+  min-width: 180px;
+  font-size: 12px;
+}
+
+.dash-donut-legend li {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.dash-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.dash-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-legend-meta {
+  color: #666;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dash-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.dash-stat-card {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e8e8e6;
+  border-radius: 8px;
+}
+
+.dash-stat-card-fuel {
+  border-left: 3px solid #e85d04;
+}
+
+.dash-stat-card-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-stat-card-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #dc0032;
+}
+
+.dash-stat-card-meta {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+}

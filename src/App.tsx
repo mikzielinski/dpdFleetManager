@@ -413,6 +413,7 @@ export default function App() {
       enrichedCompanies,
       dashboardRegionFuel,
       tableColumns,
+      dashboardFilters,
     );
   }, [
     dashboardPoc,
@@ -420,6 +421,7 @@ export default function App() {
     enrichedCompanies,
     dashboardRegionFuel,
     tableColumns,
+    dashboardFilters,
     periodFilteredPoc.length,
   ]);
 
@@ -1495,6 +1497,7 @@ export default function App() {
             data={dashboardData}
             loading={vehicleCatalogLoading || companyCatalogLoading}
             period={periodFilter}
+            filters={dashboardFilters}
             vehicleCount={vehicleCatalog?.totalVehicles ?? enrichedVehicles.length}
             companyCount={companyCatalog?.totalCompanies ?? enrichedCompanies.length}
           />

@@ -1,52 +1,52 @@
 import type { DashboardData } from '../services/dashboardAnalytics';
-import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
+import type { RegionFuelRow } from '../services/regionFuelAnalytics';
+import type { DashboardFilterState } from '../utils/dashboardFilters';
+import { planDashboardView } from '../utils/dashboardView';
 import { isPeriodFilterActive, type PeriodFilterState } from '../utils/periodFilter';
+import {
+  categorySegments,
+  ColumnChart,
+  decisionSegments,
+  DonutChart,
+  healthSegments,
+  RankBarChart,
+  StatCards,
+} from './DashboardCharts';
 
 interface Props {
   data: DashboardData | null;
   loading: boolean;
   period: PeriodFilterState;
+  filters: DashboardFilterState;
   vehicleCount: number;
   companyCount: number;
 }
 
-function BarChart({
-  title,
-  rows,
-  valueKey = 'total',
-  formatValue,
-}: {
-  title: string;
-  rows: { name: string; total: number; count: number }[];
-  valueKey?: 'total' | 'count';
-  formatValue?: (n: number) => string;
-}) {
-  if (!rows.length) return null;
-  const max = Math.max(...rows.map((r) => r[valueKey]), 1);
-  const fmt = formatValue ?? ((n: number) => n.toLocaleString('pl-PL', { maximumFractionDigits: 0 }));
+function fuelAsRankRows(rows: RegionFuelRow[]) {
+  return rows.map((r) => ({
+    name: r.region,
+    total: r.fuelCost,
+    count: r.fuelCount,
+  }));
+}
 
+function fuelStatCards(rows: RegionFuelRow[]) {
   return (
-    <div className="dash-chart-card">
-      <h4 className="stats-subtitle">{title}</h4>
-      <ul className="category-bars dash-bars">
-        {rows.map((r) => {
-          const val = r[valueKey];
-          const pct = Math.round((val / max) * 100);
-          return (
-            <li key={r.name} className="category-bar-row">
-              <span className="category-bar-label" title={r.name}>
-                {r.name}
-              </span>
-              <div className="category-bar-track">
-                <div className="category-bar-fill dash-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <span className="category-bar-meta">
-                {r.count} · {fmt(val)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+    <div className="dash-chart-card dash-chart-wide">
+      <h4 className="stats-subtitle">Paliwo wg regionu</h4>
+      <div className="dash-stat-cards">
+        {rows.map((r) => (
+          <div key={r.region} className="dash-stat-card dash-stat-card-fuel">
+            <span className="dash-stat-card-name">{r.region}</span>
+            <span className="dash-stat-card-value">{r.fuelCost.toFixed(0)} PLN</span>
+            <span className="dash-stat-card-meta">
+              {r.fuelCount} tank.
+              {r.fuelLitersPer100Km != null ? ` · ${r.fuelLitersPer100Km.toFixed(1)} L/100 km` : ''}
+              {r.drivenKm > 0 ? ` · ${r.drivenKm.toFixed(0)} km` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -55,6 +55,7 @@ export function DashboardSection({
   data,
   loading,
   period,
+  filters,
   vehicleCount,
   companyCount,
 }: Props) {
@@ -89,22 +90,33 @@ export function DashboardSection({
     );
   }
 
+  const plan = planDashboardView(filters, data);
   const { stats } = data;
-  const maxHealth = Math.max(...data.healthBuckets.map((b) => b.count), 1);
+  const serviceRows = stats.byService.slice(0, 8).map((s) => ({
+    name: s.name,
+    total: s.total,
+    count: s.count,
+  }));
+  const monthRows = data.costsByMonth.map((m) => ({
+    label: m.label,
+    total: m.total,
+    count: m.count,
+  }));
+  const categoryFilterLabel = filters.category ? ` · kategoria: ${filters.category}` : '';
 
   return (
     <section className="panel dashboard-panel">
       <div className="panel-head">
         <h2>Dashboard floty</h2>
         <span className="badge badge-muted">
-          Okres: {periodLabel} · {data.recordCount} rozliczeń
+          Okres: {periodLabel}
+          {categoryFilterLabel} · {data.recordCount} rozliczeń
         </span>
       </div>
 
       <p className="filter-hint dash-source-hint">
-        Wykresy na podstawie DPD_POC w wybranym okresie (slicer u góry) oraz katalogu B2B (
-        {vehicleCount} pojazdów, {companyCount} firm). Uzupełnienie staging może wpływać na koszty i
-        compliance.
+        Wykresy z DPD_POC w wybranym okresie i filtrach ({vehicleCount} pojazdów, {companyCount}{' '}
+        firm). Sekcja paliwa tylko przy „Wszystkie kategorie” lub filtrze Paliwo.
       </p>
 
       <div className="stats-kpi-row dash-kpi-row">
@@ -131,124 +143,124 @@ export function DashboardSection({
       </div>
 
       <div className="dashboard-grid">
-        {stats.byCategory.length > 0 && (
-          <div className="dash-chart-card dash-chart-wide">
-            <h4 className="stats-subtitle">Koszty wg kategorii</h4>
-            <ul className="category-bars">
-              {stats.byCategory.map((c) => {
-                const meta = SERVICE_CATEGORIES.find((x) => x.id === c.category);
-                const maxCat = Math.max(...stats.byCategory.map((x) => x.total), 1);
-                const pct = Math.round((c.total / maxCat) * 100);
-                return (
-                  <li key={c.category} className="category-bar-row">
-                    <span className="category-bar-label">{meta?.label ?? c.category}</span>
-                    <div className="category-bar-track">
-                      <div
-                        className="category-bar-fill"
-                        style={{ width: `${pct}%`, backgroundColor: meta?.color ?? '#dc0032' }}
-                      />
-                    </div>
-                    <span className="category-bar-meta">
-                      {c.count} · {c.total.toFixed(0)} PLN
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+        {plan.showCategory && plan.categoryKind === 'donut' && (
+          <div className="dash-chart-wide">
+            <DonutChart
+              title="Udział kosztów wg kategorii"
+              segments={categorySegments(stats.byCategory)}
+              valueSuffix="PLN"
+            />
+          </div>
+        )}
+        {plan.showCategory && plan.categoryKind === 'bars' && (
+          <RankBarChart
+            title="Koszty wg kategorii"
+            rows={stats.byCategory.map((c) => ({
+              name: c.category,
+              total: c.total,
+              count: c.count,
+            }))}
+            barClass="dash-bar-fill"
+          />
+        )}
+
+        {filters.category && stats.byCategory.length === 1 && (
+          <div className="dash-chart-card dash-chart-highlight">
+            <h4 className="stats-subtitle">Wybrana kategoria</h4>
+            <p className="dash-single-cat">
+              {stats.byCategory[0]!.category}:{' '}
+              <strong>{stats.byCategory[0]!.total.toFixed(0)} PLN</strong> (
+              {stats.byCategory[0]!.count} rozliczeń)
+            </p>
           </div>
         )}
 
-        {data.costsByMonth.length > 0 && (
-          <div className="dash-chart-card">
-            <h4 className="stats-subtitle">Koszty w czasie (miesiące)</h4>
-            <div className="dash-column-chart" role="img" aria-label="Wykres słupkowy kosztów miesięcznych">
-              {data.costsByMonth.map((m) => {
-                const maxM = Math.max(...data.costsByMonth.map((x) => x.total), 1);
-                const h = Math.max(4, Math.round((m.total / maxM) * 100));
-                return (
-                  <div key={m.month} className="dash-column" title={`${m.label}: ${m.total.toFixed(0)} PLN`}>
-                    <div className="dash-column-bar" style={{ height: `${h}%` }} />
-                    <span className="dash-column-label">{m.label}</span>
-                    <span className="dash-column-value">{m.total.toFixed(0)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        {plan.showServices && plan.servicesKind === 'donut' && (
+          <DonutChart
+            title={filters.category ? 'Usługi w kategorii' : 'Top usługi'}
+            segments={serviceRows.map((s, i) => ({
+              label: s.name,
+              value: s.total,
+              color: ['#dc0032', '#e85d04', '#0077b6', '#2a9d8f', '#7b2cbf', '#6c757d'][i % 6]!,
+              meta: `${s.count} · ${s.total.toFixed(0)} PLN`,
+            }))}
+            valueSuffix="PLN"
+          />
+        )}
+        {plan.showServices && plan.servicesKind === 'bars' && (
+          <RankBarChart title={filters.category ? 'Usługi w kategorii' : 'Top usługi'} rows={serviceRows} />
+        )}
+        {plan.showServices && plan.servicesKind === 'cards' && (
+          <StatCards title={filters.category ? 'Usługi w kategorii' : 'Top usługi'} rows={serviceRows} />
         )}
 
-        <BarChart title="Koszty wg regionu" rows={data.costsByRegion} />
-        <BarChart title="Top firmy kurierskie" rows={data.costsByCompany} />
-        <BarChart title="Top pojazdy (koszt)" rows={data.topVehicles} />
-
-        {data.healthBuckets.length > 0 && (
-          <div className="dash-chart-card">
-            <h4 className="stats-subtitle">Rozkład health score (pojazdy)</h4>
-            <ul className="category-bars">
-              {data.healthBuckets.map((b) => {
-                const pct = Math.round((b.count / maxHealth) * 100);
-                return (
-                  <li key={b.label} className="category-bar-row">
-                    <span className="category-bar-label">{b.label}</span>
-                    <div className="category-bar-track">
-                      <div className="category-bar-fill dash-bar-health" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="category-bar-meta">{b.count}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+        {plan.showMonth && plan.monthKind === 'columns' && (
+          <ColumnChart title="Koszty w czasie (miesiące)" rows={monthRows} />
+        )}
+        {plan.showMonth && plan.monthKind === 'cards' && (
+          <StatCards title="Koszty w okresie" rows={monthRows.map((m) => ({ name: m.label, ...m }))} />
         )}
 
-        {stats.byDecision.length > 0 && (
-          <div className="dash-chart-card">
-            <h4 className="stats-subtitle">Status rozliczeń</h4>
-            <ul className="category-bars">
-              {stats.byDecision.map((d) => {
-                const maxD = Math.max(...stats.byDecision.map((x) => x.count), 1);
-                const pct = Math.round((d.count / maxD) * 100);
-                return (
-                  <li key={d.label} className="category-bar-row">
-                    <span className="category-bar-label">{d.label}</span>
-                    <div className="category-bar-track">
-                      <div className="category-bar-fill dash-bar-status" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="category-bar-meta">{d.count}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+        {plan.showRegion && plan.regionKind === 'cards' && (
+          <StatCards title="Koszty wg regionu" rows={data.costsByRegion} />
+        )}
+        {plan.showRegion && plan.regionKind === 'bars' && (
+          <RankBarChart title="Koszty wg regionu" rows={data.costsByRegion} />
         )}
 
-        {data.fuelRegions.length > 0 && (
-          <div className="dash-chart-card dash-chart-wide">
-            <h4 className="stats-subtitle">Paliwo wg regionu (PLN)</h4>
-            <ul className="category-bars">
-              {data.fuelRegions.map((r) => {
-                const maxF = Math.max(...data.fuelRegions.map((x) => x.fuelCost), 1);
-                const pct = Math.round((r.fuelCost / maxF) * 100);
-                return (
-                  <li key={r.region} className="category-bar-row">
-                    <span className="category-bar-label">{r.region}</span>
-                    <div className="category-bar-track">
-                      <div
-                        className="category-bar-fill"
-                        style={{ width: `${pct}%`, backgroundColor: '#e85d04' }}
-                      />
-                    </div>
-                    <span className="category-bar-meta">
-                      {r.fuelCount} tank. · {r.fuelCost.toFixed(0)} PLN
-                      {r.fuelLitersPer100Km != null
-                        ? ` · ${r.fuelLitersPer100Km.toFixed(1)} L/100km`
-                        : ''}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+        {plan.showCompany && plan.companyKind === 'cards' && (
+          <StatCards title="Top firmy kurierskie" rows={data.costsByCompany} />
+        )}
+        {plan.showCompany && plan.companyKind === 'bars' && (
+          <RankBarChart title="Top firmy kurierskie" rows={data.costsByCompany} />
+        )}
+
+        {plan.showVehicles && plan.vehiclesKind === 'cards' && (
+          <StatCards title="Top pojazdy" rows={data.topVehicles} />
+        )}
+        {plan.showVehicles && plan.vehiclesKind === 'bars' && (
+          <RankBarChart title="Top pojazdy (koszt)" rows={data.topVehicles} />
+        )}
+
+        {plan.showHealth && plan.healthKind === 'donut' && (
+          <DonutChart
+            title="Health score floty"
+            segments={healthSegments(data.healthBuckets)}
+            valueSuffix="pojazdów"
+          />
+        )}
+        {plan.showHealth && plan.healthKind === 'bars' && (
+          <RankBarChart
+            title="Rozkład health score"
+            rows={data.healthBuckets.map((b) => ({ name: b.label, total: b.count, count: b.count }))}
+            barClass="dash-bar-health"
+            formatValue={(n) => String(n)}
+          />
+        )}
+
+        {plan.showDecision && plan.decisionKind === 'donut' && (
+          <DonutChart
+            title="Status rozliczeń"
+            segments={decisionSegments(stats.byDecision)}
+            valueSuffix="szt."
+          />
+        )}
+        {plan.showDecision && plan.decisionKind === 'bars' && (
+          <RankBarChart
+            title="Status rozliczeń"
+            rows={stats.byDecision.map((d) => ({ name: d.label, total: d.count, count: d.count }))}
+            barClass="dash-bar-status"
+            formatValue={(n) => String(n)}
+          />
+        )}
+
+        {plan.showFuel && plan.fuelKind === 'cards' && fuelStatCards(data.fuelRegions)}
+        {plan.showFuel && plan.fuelKind === 'bars' && (
+          <RankBarChart
+            title="Paliwo wg regionu (PLN)"
+            rows={fuelAsRankRows(data.fuelRegions)}
+            barClass="dash-bar-fuel"
+          />
         )}
       </div>
     </section>

@@ -154,22 +154,11 @@ function healthDistribution(vehicles: VehicleCatalogItem[]): HealthBucket[] {
   return buckets.filter((b) => b.count > 0);
 }
 
-function companiesFromFleet(
-  companies: CompanyCatalogItem[],
+/** Sumy firm z przefiltrowanego POC (spójne z slicerem i kategorią). */
+function companiesFromFilteredPoc(
   vehicles: VehicleCatalogItem[],
   poc: DpdRecord[],
 ): NamedTotal[] {
-  if (companies.length) {
-    return companies
-      .filter((c) => c.totalCost != null && c.totalCost > 0)
-      .map((c) => ({
-        name: c.name,
-        total: c.totalCost ?? 0,
-        count: c.vehicleCount,
-      }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  }
   const map = new Map<string, { total: number; count: number }>();
   const meta = plateMeta(vehicles);
   for (const r of poc) {
@@ -191,18 +180,27 @@ function companiesFromFleet(
 export function buildDashboardData(
   poc: DpdRecord[],
   vehicles: VehicleCatalogItem[],
-  companies: CompanyCatalogItem[],
+  _companies: CompanyCatalogItem[],
   regionFuelRows: RegionFuelRow[],
   tableColumns: TableColumn[] | undefined,
+  filters: DashboardFilterState,
 ): DashboardData {
+  const showFuel = !filters.category || filters.category === 'Paliwo';
+  const fuelRegions = showFuel
+    ? regionFuelRows.filter((r) => {
+        if (filters.area && r.region !== filters.area) return false;
+        return r.fuelCost > 0 || r.fuelCount > 0;
+      })
+    : [];
+
   return {
     stats: statsForFleet(poc, tableColumns),
     costsByRegion: aggregateByRegion(poc, vehicles),
-    costsByCompany: companiesFromFleet(companies, vehicles, poc),
+    costsByCompany: companiesFromFilteredPoc(vehicles, poc),
     costsByMonth: aggregateByMonth(poc),
     topVehicles: aggregateTopVehicles(poc),
     healthBuckets: healthDistribution(vehicles),
-    fuelRegions: regionFuelRows,
+    fuelRegions,
     recordCount: poc.length,
   };
 }
