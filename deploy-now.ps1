@@ -4,7 +4,15 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 Write-Host "==> git pull" -ForegroundColor Cyan
-git pull origin main
+# Git prints progress to stderr; with Stop that aborts the script on Windows PowerShell
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git pull origin main 2>&1 | ForEach-Object { Write-Host $_ }
+if ($LASTEXITCODE -ne 0) {
+  $ErrorActionPreference = $prevEap
+  throw "git pull failed (exit $LASTEXITCODE)"
+}
+$ErrorActionPreference = $prevEap
 
 if (-not (Test-Path .env)) {
   Copy-Item .env.example .env
@@ -13,9 +21,11 @@ if (-not (Test-Path .env)) {
 
 Write-Host "==> npm install" -ForegroundColor Cyan
 npm install
+if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)" }
 
 Write-Host "==> Deploy staging 1.1.0" -ForegroundColor Cyan
 node scripts/deploy-staging.mjs 1.1.0
+if ($LASTEXITCODE -ne 0) { throw "deploy-staging failed (exit $LASTEXITCODE)" }
 
 Write-Host ""
 Write-Host "App: https://mzpocevylrxu.staging.uipath.host/dpdmonitoring/" -ForegroundColor Green
