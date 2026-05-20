@@ -4,6 +4,7 @@ import type { UiPath } from '@uipath/uipath-typescript/core';
 import { DATA_FABRIC_ENTITY_LOOKUP, DPD_POC_ENTITY_ID } from '../config';
 import {
   buildLookupMap,
+  extractRelationshipId,
   findRelationshipFieldNames,
   pickRecordLabel,
   resolveLinkedVehicleId,
@@ -159,6 +160,31 @@ function blankLabel(label: string): string {
   return label === '—' || !label.trim() ? '' : label;
 }
 
+/** Dev/staging: czy w surowych rekordach są ustawione FK relacji. */
+function summarizeRelationshipData(rows: DpdRecord[], fieldNames: string[]) {
+  let filled = 0;
+  let empty = 0;
+  const byField: Record<string, { filled: number; empty: number }> = {};
+  for (const fn of fieldNames) {
+    byField[fn] = { filled: 0, empty: 0 };
+  }
+  for (const row of rows) {
+    let rowHas = false;
+    for (const fn of fieldNames) {
+      const id = extractRelationshipId(row[fn]);
+      if (id) {
+        byField[fn].filled += 1;
+        rowHas = true;
+      } else {
+        byField[fn].empty += 1;
+      }
+    }
+    if (rowHas) filled += 1;
+    else empty += 1;
+  }
+  return { filled, empty, byField };
+}
+
 /** Load B2B vehicles with area / courier company labels via Data Fabric relationships. */
 export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogData> {
   if (BYPASS_AUTH) {
@@ -263,14 +289,23 @@ export async function loadVehicleCatalog(sdk: UiPath): Promise<VehicleCatalogDat
     pocVehicleFieldNames.length > 0 ? pocVehicleFieldNames : [...POC_VEHICLE_REF_FIELDS];
 
   if (import.meta.env.DEV) {
-    const areaRel = findRelationshipFieldNames(vehiclesEntity, areaNames.filter(Boolean) as string[]);
-    const coRel = findRelationshipFieldNames(vehiclesEntity, companyNames.filter(Boolean) as string[]);
-    console.info('[vehicles] relationship fields', {
-      area: areaRel,
-      company: coRel,
-      pocToVehicle: schemaPocFields,
-      sampleCompany: withPlate[0]?.companyLabel,
-      sampleArea: withPlate[0]?.areaLabel,
+    const areaRelNames = findRelationshipFieldNames(vehiclesEntity, areaNames.filter(Boolean) as string[]);
+    const coRelNames = findRelationshipFieldNames(vehiclesEntity, companyNames.filter(Boolean) as string[]);
+    const linkStats = summarizeRelationshipData(vehicleRows, [...coRelNames, ...areaRelNames]);
+    console.info('[vehicles] diagnostyka powiązań', {
+      schema: { area: areaRelNames, company: coRelNames, pocToVehicle: schemaPocFields },
+      labelsResolved: {
+        withCompany: withPlate.filter((v) => v.companyLabel).length,
+        withArea: withPlate.filter((v) => v.areaLabel).length,
+        total: withPlate.length,
+      },
+      rawRelationshipFields: linkStats,
+      verdict:
+        linkStats.filled === 0
+          ? 'Brak FK w encji — pojazdy niepowiązane (dane), nie błąd UI'
+          : linkStats.filled > 0 && withPlate.every((v) => !v.companyLabel && !v.areaLabel)
+            ? 'FK w danych, brak etykiet w UI — sprawdź deploy / mapowanie'
+            : 'Część etykiet OK',
     });
   }
 
