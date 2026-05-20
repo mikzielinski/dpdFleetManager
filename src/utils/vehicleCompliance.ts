@@ -1,6 +1,11 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
+import { getDemoFleetCompliance } from '../data/demoFleetCases';
 import { resolveSchemaFieldName } from './entityFields';
 import type { DpdRecord } from './record';
+
+/** Uzupełnij compliance gdy Fabric nie ma pól (staging). Wyłącz: VITE_STAGING_COMPLIANCE_ENRICH=false */
+export const STAGING_COMPLIANCE_ENRICH_ENABLED =
+  import.meta.env.VITE_STAGING_COMPLIANCE_ENRICH !== 'false';
 
 export type ComplianceStatus = 'ok' | 'due_soon' | 'expired' | 'unknown';
 
@@ -24,6 +29,8 @@ export interface VehicleCompliance {
 
 const MILEAGE_FIELDS = [
   'Mileage',
+  'MileageKM',
+  'MileageKm',
   'Odometer',
   'Przebieg',
   'CurrentMileage',
@@ -142,11 +149,26 @@ export function extractVehicleCompliance(
   };
 }
 
-/** Zgodne z extractVehicleCompliance — bez warstwy demo. */
+function complianceHasFabricData(c: VehicleCompliance): boolean {
+  if (c.mileageKm != null) return true;
+  if (c.inspectionValidUntil) return true;
+  return c.policies.some((p) => p.validUntil != null);
+}
+
+/** Fabric + uzupełnienie brakujących pól (ubezpieczenia, badanie, przebieg) na stagingu. */
 export function resolveVehicleCompliance(
   row: DpdRecord,
   registration: string,
   entity?: EntityGetResponse | null,
 ): VehicleCompliance {
-  return extractVehicleCompliance(row, registration, entity);
+  const fabric = extractVehicleCompliance(row, registration, entity);
+  if (!STAGING_COMPLIANCE_ENRICH_ENABLED || !registration.trim()) return fabric;
+  if (complianceHasFabricData(fabric)) return fabric;
+
+  const enriched = getDemoFleetCompliance(registration);
+  return {
+    ...enriched,
+    mileageKm: fabric.mileageKm ?? enriched.mileageKm,
+    mileageSource: fabric.mileageKm != null ? 'fabric' : enriched.mileageSource,
+  };
 }

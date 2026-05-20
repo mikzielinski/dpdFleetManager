@@ -838,7 +838,7 @@ export default function App() {
           className="main-nav-btn main-nav-btn-report"
           title="Podsumowanie floty PDF"
           onClick={() => {
-            downloadFleetSummaryPdf({
+            void downloadFleetSummaryPdf({
               stats: fleetStats,
               vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
               companyCount: companyCatalog?.totalCompanies ?? 0,
@@ -1300,7 +1300,7 @@ export default function App() {
                         const compliance =
                           activeVehicle.compliance ??
                           resolveVehicleCompliance(activeVehicle.raw, activeVehicle.registration);
-                        downloadVehicleReportPdf({
+                        void downloadVehicleReportPdf({
                           vehicle: activeVehicle,
                           stats: activeVehicleStats,
                           health: activeVehicleHealth,
@@ -1375,7 +1375,7 @@ export default function App() {
             onOpenVehicle={openVehicleInFleet}
             onExportCompanyPdf={() => {
               if (!activeCompany || !activeCompanyStats || !activeCompanyHealth) return;
-              downloadCompanyReportPdf({
+              void downloadCompanyReportPdf({
                 company: activeCompany,
                 stats: activeCompanyStats,
                 health: activeCompanyHealth,

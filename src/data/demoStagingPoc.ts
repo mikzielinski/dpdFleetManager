@@ -5,8 +5,15 @@ export interface PocBoostVehicle {
   registration: string;
 }
 
-/** Tylko lokalny dev — domyślnie wyłączone (staging używa Data Fabric). */
-export const DEMO_POC_BOOST_ENABLED = import.meta.env.VITE_DEMO_POC_BOOST === 'true';
+/**
+ * Dodatkowe koszty POC przy małej liczbie rekordów w Fabric (staging).
+ * Wyłącz: VITE_STAGING_POC_ENRICH=false
+ */
+export const STAGING_POC_ENRICH_ENABLED =
+  import.meta.env.VITE_STAGING_POC_ENRICH !== 'false';
+
+/** @deprecated użyj STAGING_POC_ENRICH_ENABLED */
+export const DEMO_POC_BOOST_ENABLED = STAGING_POC_ENRICH_ENABLED;
 
 type PocTemplate = {
   serviceName: string;
@@ -105,13 +112,52 @@ function templatesForTag(tag: ReturnType<typeof getDemoCaseTag>): PocTemplate[] 
           decision: 'Zatwierdzono',
         },
         {
+          serviceName: 'Toll Road Charge',
+          companyName: pick(VENDORS.toll, 1),
+          netPrice: 178,
+          decision: 'Zatwierdzono',
+        },
+        {
           serviceName: 'Car Wash',
           companyName: pick(VENDORS.wash, 0),
           netPrice: 55,
           decision: 'Zatwierdzono',
         },
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 2),
+          netPrice: 312,
+          decision: 'Oczekuje',
+        },
       ];
   }
+}
+
+const EXTRA_BY_PLATE: PocTemplate[] = [
+  {
+    serviceName: 'Fuel Expense',
+    companyName: 'Orlen',
+    netPrice: 268,
+    decision: 'Zatwierdzono',
+  },
+  {
+    serviceName: 'Toll Road Charge',
+    companyName: 'Autopay',
+    netPrice: 142,
+    decision: 'Zatwierdzono',
+  },
+  {
+    serviceName: 'Parking',
+    companyName: 'DPD Hub Parking',
+    netPrice: 38,
+    decision: 'Zatwierdzono',
+  },
+];
+
+function expandedTemplates(plate: string, tag: ReturnType<typeof getDemoCaseTag>): PocTemplate[] {
+  const base = templatesForTag(tag);
+  const h = plate.length % EXTRA_BY_PLATE.length;
+  return [...base, ...EXTRA_BY_PLATE.slice(h), ...EXTRA_BY_PLATE.slice(0, h)].slice(0, 8);
 }
 
 function existingCountForPlate(allPoc: DpdRecord[], plate: string): number {
@@ -138,8 +184,9 @@ export function generateStagingDemoPocRecords(
     if (!plate) continue;
     const have = existingCountForPlate(existingPoc, plate);
     const tag = getDemoCaseTag(plate);
-    const templates = templatesForTag(tag);
-    const want = have === 0 ? templates.length : have < 2 ? Math.min(2, templates.length) : 0;
+    const templates = expandedTemplates(plate, tag);
+    const targetMin = 6;
+    const want = Math.max(0, Math.min(templates.length, targetMin - have));
 
     for (let i = 0; i < want; i++) {
       const t = templates[i]!;
@@ -176,7 +223,7 @@ export function appendDemoPocBoost(
   vehicles: PocBoostVehicle[],
   pocItems: DpdRecord[],
 ): DpdRecord[] {
-  if (!DEMO_POC_BOOST_ENABLED || !vehicles.length) return pocItems;
+  if (!STAGING_POC_ENRICH_ENABLED || !vehicles.length) return pocItems;
   const extra = generateStagingDemoPocRecords(vehicles, pocItems);
   return extra.length ? [...pocItems, ...extra] : pocItems;
 }

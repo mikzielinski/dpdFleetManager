@@ -1,10 +1,9 @@
 /**
  * Pola daty i przebiegu w DPD_POC / DPD_B2B_Vehicles (Data Fabric).
- * Uruchom po: uip login --organization mzpocevylrxu --tenant DefaultTenant
+ * Uruchom po: npm run login:staging
  *
- * node scripts/diagnose-fabric-fields.mjs
+ * npm run diagnose:fabric
  */
-import { fileURLToPath } from 'url';
 import {
   loadStagingDeployConfig,
   REPO_ROOT,

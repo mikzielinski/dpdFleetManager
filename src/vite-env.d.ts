@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_BYPASS_AUTH?: string;
   readonly VITE_DEMO_FLEET_CASES?: string;
   readonly VITE_DEMO_POC_BOOST?: string;
+  readonly VITE_STAGING_COMPLIANCE_ENRICH?: string;
+  readonly VITE_STAGING_POC_ENRICH?: string;
   readonly VITE_UIPATH_CLIENT_ID: string;
   readonly VITE_UIPATH_SCOPE: string;
   readonly VITE_UIPATH_ORG_NAME: string;
