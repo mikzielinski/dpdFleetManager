@@ -16,11 +16,6 @@ import {
   resolveRelationshipLabel,
   resolveSchemaFieldName,
 } from '../utils/entityFields';
-import {
-  DEMO_FLEET_CASES_ENABLED,
-  demoFieldsForB2BRecord,
-  getDemoFleetCompliance,
-} from '../data/demoFleetCases';
 import { resolveVehicleCompliance, type VehicleCompliance } from '../utils/vehicleCompliance';
 import type { HealthGrade } from '../utils/healthScore';
 import { normalizeDpdRecord, normalizeRegistration, registrationsMatch, type DpdRecord } from '../utils/record';
@@ -437,16 +432,10 @@ function mockVehicleCatalog(): VehicleCatalogData {
       raw: { Id: 'v6', CarRegistration: 'WR117DPD' },
     },
   ];
-  const vehicles: VehicleCatalogItem[] = specs.map((v) => {
-    const compliance = DEMO_FLEET_CASES_ENABLED
-      ? getDemoFleetCompliance(v.registration)
-      : resolveVehicleCompliance(v.raw, v.registration);
-    return {
-      ...v,
-      raw: { ...v.raw, ...demoFieldsForB2BRecord(compliance) },
-      compliance,
-    };
-  });
+  const vehicles: VehicleCatalogItem[] = specs.map((v) => ({
+    ...v,
+    compliance: resolveVehicleCompliance(v.raw, v.registration),
+  }));
   const areaOptions = [...new Set(vehicles.map((v) => v.areaLabel).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, 'pl'),
   );

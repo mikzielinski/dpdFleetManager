@@ -2,7 +2,7 @@ import { categorizeService } from '../utils/serviceCategories';
 import { getRecordNumericAmount } from '../utils/filterRecords';
 import type { DpdRecord } from '../utils/record';
 import { normalizeRegistration, pickField } from '../utils/record';
-import { mileageKmInPeriod } from '../data/demoMileageReports';
+import { mileageKmInPeriodFromFabric } from './fabricMileage';
 import type { PeriodFilterState } from '../utils/periodFilter';
 import type { VehicleCatalogItem } from './vehicleCatalog';
 import { matchCostsToVehicle } from './vehicleCatalog';
@@ -62,6 +62,7 @@ function plateToRegion(
 /** Zużycie paliwa wg regionu / miasta w wybranym okresie. */
 export function aggregateFuelByRegion(
   pocInPeriod: DpdRecord[],
+  allPocForMileage: DpdRecord[],
   vehicles: VehicleCatalogItem[],
   period: PeriodFilterState,
 ): RegionFuelRow[] {
@@ -78,7 +79,12 @@ export function aggregateFuelByRegion(
 
   for (const v of vehicles) {
     const region = v.areaLabel?.trim() || 'Nieprzypisany';
-    const { drivenKm } = mileageKmInPeriod(v.registration, v.compliance?.mileageKm, period);
+    const { drivenKm } = mileageKmInPeriodFromFabric(
+      v.registration,
+      allPocForMileage,
+      period,
+      v.compliance?.mileageKm,
+    );
     const entry = byRegion.get(region) ?? {
       fuelCost: 0,
       fuelLiters: 0,
@@ -135,6 +141,7 @@ export function aggregateFuelByRegion(
 export function statsForVehicleFuelPeriod(
   vehicle: VehicleCatalogItem,
   pocInPeriod: DpdRecord[],
+  allPocForMileage: DpdRecord[],
   pocVehicleFieldNames: readonly string[],
   period: PeriodFilterState,
   regionRows: RegionFuelRow[],
@@ -150,10 +157,11 @@ export function statsForVehicleFuelPeriod(
     fuelCount += 1;
   }
 
-  const { drivenKm } = mileageKmInPeriod(
+  const { drivenKm } = mileageKmInPeriodFromFabric(
     vehicle.registration,
-    vehicle.compliance?.mileageKm,
+    allPocForMileage,
     period,
+    vehicle.compliance?.mileageKm,
   );
   const region = vehicle.areaLabel?.trim() || 'Nieprzypisany';
   const regionRow = regionRows.find((x) => x.region === region);

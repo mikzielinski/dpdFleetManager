@@ -3,8 +3,8 @@ import { complianceStatusForDate } from '../utils/vehicleCompliance';
 import { normalizeRegistration } from '../utils/record';
 import { pickSyntheticPartner } from './syntheticB2BVendors';
 
-export const DEMO_FLEET_CASES_ENABLED =
-  import.meta.env.VITE_DEMO_FLEET_CASES !== 'false';
+/** Tylko lokalny dev — domyślnie wyłączone (staging używa Data Fabric). */
+export const DEMO_FLEET_CASES_ENABLED = import.meta.env.VITE_DEMO_FLEET_CASES === 'true';
 
 export type DemoCaseTag =
   | 'ok'
@@ -51,7 +51,7 @@ function finalizeCase(spec: DemoFleetCase): VehicleCompliance {
   }
   return {
     mileageKm: spec.mileageKm,
-    mileageSource: 'demo',
+    mileageSource: 'fabric',
     inspectionValidUntil: spec.inspectionValidUntil,
     inspectionStatus,
     policies,

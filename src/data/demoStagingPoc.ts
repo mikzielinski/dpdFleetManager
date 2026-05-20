@@ -5,7 +5,8 @@ export interface PocBoostVehicle {
   registration: string;
 }
 
-export const DEMO_POC_BOOST_ENABLED = import.meta.env.VITE_DEMO_POC_BOOST !== 'false';
+/** Tylko lokalny dev — domyślnie wyłączone (staging używa Data Fabric). */
+export const DEMO_POC_BOOST_ENABLED = import.meta.env.VITE_DEMO_POC_BOOST === 'true';
 
 type PocTemplate = {
   serviceName: string;
@@ -178,4 +179,12 @@ export function appendDemoPocBoost(
   if (!DEMO_POC_BOOST_ENABLED || !vehicles.length) return pocItems;
   const extra = generateStagingDemoPocRecords(vehicles, pocItems);
   return extra.length ? [...pocItems, ...extra] : pocItems;
+}
+
+/** Dołącza syntetyczne POC tylko gdy VITE_DEMO_POC_BOOST=true. */
+export function applyPocDatasetPolicy(
+  vehicles: PocBoostVehicle[],
+  pocItems: DpdRecord[],
+): DpdRecord[] {
+  return appendDemoPocBoost(vehicles, pocItems);
 }

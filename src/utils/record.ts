@@ -19,7 +19,18 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   fleetManagerNote: ['FleetManagerNote', 'fleetManagerNote'],
   fraudFlag: ['FraudFlag', 'fraudFlag'],
   invoiceFileName: ['invoiceFileName', 'InvoiceFileName', 'Invoice File'],
-  date: ['Date', 'date', 'ServiceDate', 'serviceDate'],
+  date: ['Date', 'date', 'ServiceDate', 'serviceDate', 'InvoiceDate', 'invoiceDate', 'TransactionDate'],
+  mileage: [
+    'Mileage',
+    'Odometer',
+    'Przebieg',
+    'OdometerReading',
+    'CurrentMileage',
+    'Kilometers',
+    'LastOdometer',
+    'VehicleMileage',
+    'ReportedMileage',
+  ],
   totalPrice: ['TotalPrice', 'totalPrice', 'GrossPrice', 'grossPrice'],
   anomalyReason: ['AnomalyReason', 'anomalyReason', 'FraudFlag', 'fraudFlag'],
   comments: ['Comments', 'comments', 'ManagerComment', 'managerComment'],
@@ -172,19 +183,29 @@ function parseRecordDateValue(v: unknown): Date | null {
   return null;
 }
 
-/** Data rozliczenia (faktura / usługa); fallback CreateTime z Fabric. */
+/** Data rozliczenia z pól biznesowych encji; na końcu CreateTime z Data Fabric. */
 export function getRecordDate(r: DpdRecord): Date | null {
   const normalized = normalizeDpdRecord(r);
-  const keys = [
-    ...FIELD_ALIASES.date,
-    'CreateTime',
-    'createTime',
-    'UpdateTime',
-  ];
-  for (const key of keys) {
+  for (const key of FIELD_ALIASES.date) {
     const v = normalized[key] ?? resolveRecordField(normalized, key, key);
     const d = parseRecordDateValue(v);
     if (d) return d;
+  }
+  for (const key of ['CreateTime', 'createTime']) {
+    const v = normalized[key];
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  return null;
+}
+
+export function getRecordMileage(r: DpdRecord): number | null {
+  const normalized = normalizeDpdRecord(r);
+  for (const key of FIELD_ALIASES.mileage) {
+    const v = normalized[key] ?? resolveRecordField(normalized, key, key);
+    if (v === undefined || v === null || v === '') continue;
+    const n = Number(String(v).replace(/\s/g, '').replace(',', '.'));
+    if (Number.isFinite(n) && n > 0) return Math.round(n);
   }
   return null;
 }

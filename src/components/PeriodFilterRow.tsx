@@ -86,8 +86,8 @@ export function PeriodFilterRow({
       )}
 
       <p className="filter-hint period-hint">
-        Przebieg: miesięczne raporty kierowcy. Paliwo i koszty — w wybranym okresie; porównanie
-        PLN/km względem średniej regionu / miasta.
+        Koszty i paliwo z DPD_POC w wybranym okresie (data usługi lub CreateTime). Przebieg w okresie
+        liczony z odczytów licznika na rozliczeniach POC / polu Przebieg w B2B.
       </p>
     </div>
   );

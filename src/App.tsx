@@ -66,7 +66,7 @@ import {
 } from './services/vehicleCatalog';
 import { computeHealthScore } from './utils/healthScore';
 import { resolveVehicleCompliance } from './utils/vehicleCompliance';
-import { appendDemoPocBoost } from './data/demoStagingPoc';
+import { applyPocDatasetPolicy } from './data/demoStagingPoc';
 import { FuelRegionPanel } from './components/FuelRegionPanel';
 import {
   aggregateFuelByRegion,
@@ -340,19 +340,32 @@ export default function App() {
 
   const regionFuelRows = useMemo(() => {
     if (!vehicleCatalog?.vehicles.length) return [];
-    return aggregateFuelByRegion(periodFilteredPoc, enrichedVehicles, periodFilter);
-  }, [periodFilteredPoc, enrichedVehicles, periodFilter, vehicleCatalog]);
+    return aggregateFuelByRegion(
+      periodFilteredPoc,
+      pocSourceForPeriod,
+      enrichedVehicles,
+      periodFilter,
+    );
+  }, [periodFilteredPoc, pocSourceForPeriod, enrichedVehicles, periodFilter, vehicleCatalog]);
 
   const activeVehicleFuelStats = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return null;
     return statsForVehicleFuelPeriod(
       activeVehicle,
       periodFilteredPoc,
+      pocSourceForPeriod,
       vehicleCatalog.pocVehicleFieldNames,
       periodFilter,
       regionFuelRows,
     );
-  }, [activeVehicle, periodFilteredPoc, vehicleCatalog, periodFilter, regionFuelRows]);
+  }, [
+    activeVehicle,
+    periodFilteredPoc,
+    pocSourceForPeriod,
+    vehicleCatalog,
+    periodFilter,
+    regionFuelRows,
+  ]);
 
   const activeVehicleCosts = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return [];
@@ -435,7 +448,7 @@ export default function App() {
       const maps = ctxRef.current?.choiceMaps ?? new Map();
       const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
       const catalog = await loadVehicleCatalog(sdk, pocItems);
-      const pocWithDemo = appendDemoPocBoost(catalog.vehicles, pocItems);
+      const pocWithDemo = applyPocDatasetPolicy(catalog.vehicles, pocItems);
       setVehicleCatalog(catalog);
       setAllPocCosts(pocWithDemo);
     } catch (e) {
@@ -454,11 +467,11 @@ export default function App() {
       const maps = ctxRef.current?.choiceMaps ?? new Map();
       const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
       if (vehicleCatalog) {
-        setAllPocCosts(appendDemoPocBoost(vehicleCatalog.vehicles, pocItems));
+        setAllPocCosts(applyPocDatasetPolicy(vehicleCatalog.vehicles, pocItems));
       } else {
         const catalog = await loadVehicleCatalog(sdk, pocItems);
         setVehicleCatalog(catalog);
-        setAllPocCosts(appendDemoPocBoost(catalog.vehicles, pocItems));
+        setAllPocCosts(applyPocDatasetPolicy(catalog.vehicles, pocItems));
       }
     } catch {
       /* vehicles tab refresh shows errors */
@@ -496,7 +509,7 @@ export default function App() {
         const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
         const cat = await loadVehicleCatalog(sdk, pocItems);
         setVehicleCatalog(cat);
-        setAllPocCosts(appendDemoPocBoost(cat.vehicles, pocItems));
+        setAllPocCosts(applyPocDatasetPolicy(cat.vehicles, pocItems));
         fleet = cat.vehicles;
       }
       const companies = await loadCompanyCatalog(sdk, fleet);

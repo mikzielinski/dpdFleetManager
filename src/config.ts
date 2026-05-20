@@ -43,6 +43,7 @@ export interface TableColumn {
 /** Table columns (fallback if schema load fails) */
 export const TABLE_COLUMNS: TableColumn[] = [
   { key: 'carRegistration', fieldName: 'CarRegistration', label: 'Pojazd' },
+  { key: 'date', fieldName: 'Date', label: 'Data' },
   { key: 'serviceName', fieldName: 'ServiceName', label: 'Usługa' },
   { key: 'companyName', fieldName: 'CompanyName', label: 'Nazwa firmy' },
   { key: 'taxId', fieldName: 'TaxID', label: 'NIP' },
@@ -53,12 +54,16 @@ export const TABLE_COLUMNS: TableColumn[] = [
 /** Preferred Data Fabric fields for the grid (PascalCase names from entity schema) */
 export const TABLE_FIELD_PREFERENCES = [
   'CarRegistration',
+  'Date',
+  'ServiceDate',
   'ServiceName',
   'CompanyName',
   'TaxID',
   'NetPrice',
   'Amount',
   'Status',
+  'Mileage',
+  'Przebieg',
 ];
 
 export const INVOICE_FILE_FIELD_CANDIDATES = [

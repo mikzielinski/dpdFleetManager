@@ -1,11 +1,6 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
-import {
-  DEMO_FLEET_CASES_ENABLED,
-  getDemoFleetCompliance,
-} from '../data/demoFleetCases';
 import { resolveSchemaFieldName } from './entityFields';
 import type { DpdRecord } from './record';
-import { normalizeRegistration } from './record';
 
 export type ComplianceStatus = 'ok' | 'due_soon' | 'expired' | 'unknown';
 
@@ -20,7 +15,7 @@ export interface InsurancePolicyInfo {
 
 export interface VehicleCompliance {
   mileageKm: number | null;
-  mileageSource: 'fabric' | 'estimated' | 'demo' | 'missing';
+  mileageSource: 'fabric' | 'missing';
   inspectionValidUntil: string | null;
   inspectionStatus: ComplianceStatus;
   policies: InsurancePolicyInfo[];
@@ -84,23 +79,10 @@ export function complianceStatusForDate(isoDate: string | null, soonDays = 30): 
   return 'ok';
 }
 
-function stableDaysFromSeed(seed: string, minDays: number, maxDays: number): number {
-  const s = normalizeRegistration(seed);
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return minDays + (h % (maxDays - minDays + 1));
-}
-
-function addDaysIso(base: Date, days: number): string {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Dane z encji B2B lub estymata deterministyczna (staging bez pól compliance). */
+/** Pola compliance wyłącznie z encji DPD_B2B_Vehicles (Data Fabric). */
 export function extractVehicleCompliance(
   row: DpdRecord,
-  registration: string,
+  _registration: string,
   entity?: EntityGetResponse | null,
 ): VehicleCompliance {
   const mileageField =
@@ -112,11 +94,8 @@ export function extractVehicleCompliance(
     mileageKm = parseMileage(row[f]);
   }
 
-  let mileageSource: VehicleCompliance['mileageSource'] = mileageKm != null ? 'fabric' : 'missing';
-  if (mileageKm == null && registration) {
-    mileageKm = 40_000 + stableDaysFromSeed(registration, 0, 180_000);
-    mileageSource = 'estimated';
-  }
+  const mileageSource: VehicleCompliance['mileageSource'] =
+    mileageKm != null ? 'fabric' : 'missing';
 
   let inspectionValidUntil: string | null = null;
   const inspField =
@@ -135,10 +114,6 @@ export function extractVehicleCompliance(
       validUntil = parseDateLoose(row[f]);
       if (validUntil) break;
     }
-    if (!validUntil && mileageSource === 'estimated') {
-      const offset = spec.type === 'OC' ? 120 : spec.type === 'AC' ? 200 : 90;
-      validUntil = addDaysIso(new Date(), stableDaysFromSeed(registration + spec.type, -30, offset));
-    }
     const status = complianceStatusForDate(validUntil);
     policies.push({
       type: spec.type,
@@ -146,13 +121,6 @@ export function extractVehicleCompliance(
       status,
       label: spec.type,
     });
-  }
-
-  if (!inspectionValidUntil && mileageSource === 'estimated') {
-    inspectionValidUntil = addDaysIso(
-      new Date(),
-      stableDaysFromSeed(registration + 'insp', -60, 365),
-    );
   }
 
   const inspectionStatus = complianceStatusForDate(inspectionValidUntil);
@@ -174,14 +142,11 @@ export function extractVehicleCompliance(
   };
 }
 
-/** Fabric first; na stagingu brak pól compliance → scenariusze demo zamiast estymaty. */
+/** Zgodne z extractVehicleCompliance — bez warstwy demo. */
 export function resolveVehicleCompliance(
   row: DpdRecord,
   registration: string,
   entity?: EntityGetResponse | null,
 ): VehicleCompliance {
-  const fabric = extractVehicleCompliance(row, registration, entity);
-  if (!DEMO_FLEET_CASES_ENABLED || !registration.trim()) return fabric;
-  if (fabric.mileageSource === 'fabric') return fabric;
-  return getDemoFleetCompliance(registration);
+  return extractVehicleCompliance(row, registration, entity);
 }
