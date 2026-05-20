@@ -65,7 +65,8 @@ import {
   type VehicleCatalogItem,
 } from './services/vehicleCatalog';
 import { computeHealthScore } from './utils/healthScore';
-import { extractVehicleCompliance } from './utils/vehicleCompliance';
+import { resolveVehicleCompliance } from './utils/vehicleCompliance';
+import { appendDemoPocBoost } from './data/demoStagingPoc';
 import {
   DEFAULT_COMPANY_FILTERS,
   type CompanyFilterState,
@@ -188,7 +189,7 @@ export default function App() {
   const enrichedVehicles = useMemo((): VehicleCatalogItem[] => {
     if (!vehicleCatalog) return [];
     return vehicleCatalog.vehicles.map((v) => {
-      const compliance = v.compliance ?? extractVehicleCompliance(v.raw, v.registration);
+      const compliance = v.compliance ?? resolveVehicleCompliance(v.raw, v.registration);
       const stats = statsForVehicle(
         v,
         allPocCosts,
@@ -397,8 +398,9 @@ export default function App() {
       const maps = ctxRef.current?.choiceMaps ?? new Map();
       const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
       const catalog = await loadVehicleCatalog(sdk, pocItems);
+      const pocWithDemo = appendDemoPocBoost(catalog.vehicles, pocItems);
       setVehicleCatalog(catalog);
-      setAllPocCosts(pocItems);
+      setAllPocCosts(pocWithDemo);
     } catch (e) {
       setVehicleCatalogError(e instanceof Error ? e.message : String(e));
       setVehicleCatalog(null);
@@ -434,7 +436,7 @@ export default function App() {
         const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
         const cat = await loadVehicleCatalog(sdk, pocItems);
         setVehicleCatalog(cat);
-        setAllPocCosts(pocItems);
+        setAllPocCosts(appendDemoPocBoost(cat.vehicles, pocItems));
         fleet = cat.vehicles;
       }
       const companies = await loadCompanyCatalog(sdk, fleet);
@@ -1203,7 +1205,7 @@ export default function App() {
                       onExportPdf={() => {
                         const compliance =
                           activeVehicle.compliance ??
-                          extractVehicleCompliance(activeVehicle.raw, activeVehicle.registration);
+                          resolveVehicleCompliance(activeVehicle.raw, activeVehicle.registration);
                         downloadVehicleReportPdf({
                           vehicle: activeVehicle,
                           stats: activeVehicleStats,

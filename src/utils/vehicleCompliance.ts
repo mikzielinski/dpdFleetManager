@@ -1,4 +1,8 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
+import {
+  DEMO_FLEET_CASES_ENABLED,
+  getDemoFleetCompliance,
+} from '../data/demoFleetCases';
 import { resolveSchemaFieldName } from './entityFields';
 import type { DpdRecord } from './record';
 import { normalizeRegistration } from './record';
@@ -16,7 +20,7 @@ export interface InsurancePolicyInfo {
 
 export interface VehicleCompliance {
   mileageKm: number | null;
-  mileageSource: 'fabric' | 'estimated' | 'missing';
+  mileageSource: 'fabric' | 'estimated' | 'demo' | 'missing';
   inspectionValidUntil: string | null;
   inspectionStatus: ComplianceStatus;
   policies: InsurancePolicyInfo[];
@@ -168,4 +172,16 @@ export function extractVehicleCompliance(
     policies,
     complianceIssues,
   };
+}
+
+/** Fabric first; na stagingu brak pól compliance → scenariusze demo zamiast estymaty. */
+export function resolveVehicleCompliance(
+  row: DpdRecord,
+  registration: string,
+  entity?: EntityGetResponse | null,
+): VehicleCompliance {
+  const fabric = extractVehicleCompliance(row, registration, entity);
+  if (!DEMO_FLEET_CASES_ENABLED || !registration.trim()) return fabric;
+  if (fabric.mileageSource === 'fabric') return fabric;
+  return getDemoFleetCompliance(registration);
 }
