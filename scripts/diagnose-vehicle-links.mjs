@@ -56,23 +56,36 @@ function entityNameMatches(refName, candidates) {
 function headers(token) {
   return {
     Authorization: `Bearer ${token}`,
-    'x-uipath-internal-tenantid': cfg.tenantId,
-    'x-uipath-folderkey': cfg.folderKey,
     'Content-Type': 'application/json',
   };
 }
 
-const apiBase = `https://${cfg.apiHost}`;
+/** Jak SDK: https://staging.api.uipath.com/{orgName}/{tenantName}/datafabric_/... */
+const apiRoot = `https://${cfg.apiHost}/${cfg.orgName}/${cfg.tenantName}/`;
 
 async function apiGet(token, path, params = {}) {
-  const q = new URLSearchParams();
+  const normalized = path.startsWith('/') ? path.slice(1) : path;
+  const url = new URL(normalized, apiRoot);
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null) q.set(k, String(v));
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   }
-  const url = `${apiBase}${path}${q.size ? `?${q}` : ''}`;
   const res = await fetch(url, { headers: headers(token) });
-  if (!res.ok) throw new Error(`${path} → ${res.status} ${await res.text()}`);
-  return res.json();
+  const text = await res.text();
+  const ctype = res.headers.get('content-type') ?? '';
+  if (!res.ok) {
+    throw new Error(
+      `${url.pathname} → HTTP ${res.status}\n${text.slice(0, 400)}`,
+    );
+  }
+  if (!ctype.includes('json')) {
+    throw new Error(
+      `${url.pathname} → oczekiwano JSON, otrzymano ${ctype || 'unknown'}\n` +
+        `URL: ${url}\n` +
+        `${text.slice(0, 300)}\n` +
+        'Sprawdź: uip login na staging (nie cloud), org mzpocevylrxu, tenant DefaultTenant.',
+    );
+  }
+  return JSON.parse(text);
 }
 
 async function listEntities(token) {
@@ -188,6 +201,7 @@ async function main() {
     process.exit(1);
   }
 
+  console.log(`API: ${apiRoot}datafabric_/api/Entity`);
   console.log('Pobieram metadane encji…');
   const all = await listEntities(token);
   const vehiclesMeta = resolveEntity(all, ENTITY_NAMES.vehicles);
