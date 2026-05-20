@@ -35,11 +35,19 @@ Zmienne `VITE_*` są **wbudowywane w bundle** przy `npm run build`.
 ## Logowanie CLI
 
 ```powershell
-# Staging
-uip login --organization mzpocevylrxu --tenant DefaultTenant
+# Staging (wymagane — bez --authority loguje na cloud.uipath.com)
+uip logout
+uip login --organization mzpocevylrxu --tenant DefaultTenant --authority https://staging.uipath.com/identity_
 
 # Production (po migracji)
 uip login --organization <org-name> --tenant <tenant-name>
+```
+
+Deploy jednym poleceniem (z katalogu repozytorium, po loginie):
+
+```powershell
+.\deploy-now.ps1
+# lub: npm run deploy:staging
 ```
 
 Token trafia do `%USERPROFILE%\.uipath\.auth` (nie commituj).
