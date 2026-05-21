@@ -124,6 +124,36 @@ export function formatPeriodRangeLabel(state: PeriodFilterState, now = new Date(
   return `${preset}: ${fmt(from)} – ${fmt(to)}`;
 }
 
+/** Poprzedni okres o tej samej długości co bieżący preset (do trendów KPI). */
+export function resolvePreviousPeriodBounds(
+  state: PeriodFilterState,
+  now = new Date(),
+): { from: Date; to: Date } | null {
+  if (!isPeriodFilterActive(state)) return null;
+  const { from, to } = resolvePeriodBounds(state, now);
+  const spanMs = to.getTime() - from.getTime() + 1;
+  const prevEnd = new Date(from.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - spanMs + 1);
+  return { from: startOfDay(prevStart), to: endOfDay(prevEnd) };
+}
+
+export function filterRecordsByPreviousPeriod(
+  items: DpdRecord[],
+  state: PeriodFilterState,
+  now = new Date(),
+): DpdRecord[] {
+  const bounds = resolvePreviousPeriodBounds(state, now);
+  if (!bounds) return [];
+  const fromMs = bounds.from.getTime();
+  const toMs = bounds.to.getTime();
+  return items.filter((r) => {
+    const d = getRecordDate(r);
+    if (!d) return false;
+    const t = d.getTime();
+    return t >= fromMs && t <= toMs;
+  });
+}
+
 export function filterRecordsByPeriod(
   items: DpdRecord[],
   state: PeriodFilterState,

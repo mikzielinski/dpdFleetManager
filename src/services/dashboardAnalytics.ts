@@ -1,6 +1,10 @@
 import type { TableColumn } from '../config';
 import { categorizeService } from '../utils/serviceCategories';
-import type { DashboardFilterState } from '../utils/dashboardFilters';
+import {
+  isUnassignedLabel,
+  UNASSIGNED_REGION,
+  type DashboardFilterState,
+} from '../utils/dashboardFilters';
 import { getRecordNumericAmount } from '../utils/filterRecords';
 import type { DpdRecord } from '../utils/record';
 import { getRecordDate, normalizeRegistration, pickField } from '../utils/record';
@@ -27,6 +31,21 @@ export interface HealthBucket {
   count: number;
 }
 
+export interface UnassignedSummary {
+  regionCost: number;
+  regionCount: number;
+  companyCost: number;
+  companyCount: number;
+  recordCount: number;
+}
+
+export interface DashboardKpiTrends {
+  totalCostPct: number | null;
+  claimCountPct: number | null;
+  avgCostPct: number | null;
+  flaggedDelta: number | null;
+}
+
 export interface DashboardData {
   stats: FleetCostStats;
   costsByRegion: NamedTotal[];
@@ -36,6 +55,10 @@ export interface DashboardData {
   healthBuckets: HealthBucket[];
   fuelRegions: RegionFuelRow[];
   recordCount: number;
+  fleetAvgVehicleCost: number;
+  fleetAvgHealthScore: number | null;
+  unassigned: UnassignedSummary;
+  trends: DashboardKpiTrends | null;
 }
 
 function plateMeta(
@@ -52,14 +75,79 @@ function plateMeta(
   return map;
 }
 
+function excludeUnassignedPoc(
+  poc: DpdRecord[],
+  vehicles: VehicleCatalogItem[],
+): DpdRecord[] {
+  const meta = plateMeta(vehicles);
+  return poc.filter((r) => {
+    const reg = pickField(r, 'carRegistration', 'CarRegistration');
+    const plate = reg === '—' ? '' : normalizeRegistration(reg);
+    const area = plate ? (meta.get(plate)?.area ?? UNASSIGNED_REGION) : UNASSIGNED_REGION;
+    return area !== UNASSIGNED_REGION;
+  });
+}
+
+function filterNamedRows(rows: NamedTotal[], hideUnassigned: boolean): NamedTotal[] {
+  if (!hideUnassigned) return rows;
+  return rows.filter((r) => !isUnassignedLabel(r.name));
+}
+
+function computeUnassignedSummary(
+  poc: DpdRecord[],
+  vehicles: VehicleCatalogItem[],
+): UnassignedSummary {
+  const regions = aggregateByRegion(poc, vehicles);
+  const companies = companiesFromFilteredPoc(vehicles, poc);
+  const reg = regions.find((r) => r.name === UNASSIGNED_REGION);
+  const comp = companies.find((c) => isUnassignedLabel(c.name));
+  const meta = plateMeta(vehicles);
+  let recordCount = 0;
+  for (const r of poc) {
+    const regField = pickField(r, 'carRegistration', 'CarRegistration');
+    const plate = regField === '—' ? '' : normalizeRegistration(regField);
+    const area = plate ? (meta.get(plate)?.area ?? UNASSIGNED_REGION) : UNASSIGNED_REGION;
+    if (area === UNASSIGNED_REGION) recordCount += 1;
+  }
+  return {
+    regionCost: reg?.total ?? 0,
+    regionCount: reg?.count ?? 0,
+    companyCost: comp?.total ?? 0,
+    companyCount: comp?.count ?? 0,
+    recordCount,
+  };
+}
+
+function fleetAvgHealth(vehicles: VehicleCatalogItem[]): number | null {
+  const scored = vehicles.filter((v) => v.healthScore != null);
+  if (!scored.length) return null;
+  return scored.reduce((s, v) => s + (v.healthScore ?? 0), 0) / scored.length;
+}
+
+export function computeKpiTrends(
+  current: FleetCostStats,
+  previous: FleetCostStats | null,
+): DashboardKpiTrends | null {
+  if (!previous || previous.claimCount === 0) return null;
+  const pct = (cur: number, prev: number) =>
+    prev === 0 ? (cur > 0 ? 100 : null) : Math.round(((cur - prev) / prev) * 1000) / 10;
+  return {
+    totalCostPct: pct(current.totalCost, previous.totalCost),
+    claimCountPct: pct(current.claimCount, previous.claimCount),
+    avgCostPct: pct(current.avgCost, previous.avgCost),
+    flaggedDelta: current.flaggedCount - previous.flaggedCount,
+  };
+}
+
 export function filterPocForDashboard(
   poc: DpdRecord[],
   vehicles: VehicleCatalogItem[],
   filters: DashboardFilterState,
 ): DpdRecord[] {
-  if (!filters.area && !filters.company && !filters.category) return poc;
+  let scoped = filters.hideUnassigned ? excludeUnassignedPoc(poc, vehicles) : poc;
+  if (!filters.area && !filters.company && !filters.category) return scoped;
   const meta = plateMeta(vehicles);
-  return poc.filter((r) => {
+  return scoped.filter((r) => {
     const reg = pickField(r, 'carRegistration', 'CarRegistration');
     const plate = reg === '—' ? '' : normalizeRegistration(reg);
     const m = plate ? meta.get(plate) : undefined;
@@ -184,23 +272,43 @@ export function buildDashboardData(
   regionFuelRows: RegionFuelRow[],
   tableColumns: TableColumn[] | undefined,
   filters: DashboardFilterState,
+  previousPoc?: DpdRecord[],
 ): DashboardData {
+  const unassigned = computeUnassignedSummary(poc, vehicles);
   const showFuel = !filters.category || filters.category === 'Paliwo';
-  const fuelRegions = showFuel
+  let fuelRegions = showFuel
     ? regionFuelRows.filter((r) => {
         if (filters.area && r.region !== filters.area) return false;
+        if (filters.hideUnassigned && isUnassignedLabel(r.region)) return false;
         return r.fuelCost > 0 || r.fuelCount > 0;
       })
     : [];
 
+  const stats = statsForFleet(poc, tableColumns);
+  const allVehicles = aggregateTopVehicles(poc, 200);
+  const fleetAvgVehicleCost =
+    allVehicles.length > 0
+      ? allVehicles.reduce((s, v) => s + v.total, 0) / allVehicles.length
+      : 0;
+
+  const prevStats =
+    previousPoc && previousPoc.length > 0 ? statsForFleet(previousPoc, tableColumns) : null;
+
   return {
-    stats: statsForFleet(poc, tableColumns),
-    costsByRegion: aggregateByRegion(poc, vehicles),
-    costsByCompany: companiesFromFilteredPoc(vehicles, poc),
+    stats,
+    costsByRegion: filterNamedRows(aggregateByRegion(poc, vehicles), filters.hideUnassigned),
+    costsByCompany: filterNamedRows(
+      companiesFromFilteredPoc(vehicles, poc),
+      filters.hideUnassigned,
+    ),
     costsByMonth: aggregateByMonth(poc),
     topVehicles: aggregateTopVehicles(poc),
     healthBuckets: healthDistribution(vehicles),
     fuelRegions,
     recordCount: poc.length,
+    fleetAvgVehicleCost,
+    fleetAvgHealthScore: fleetAvgHealth(vehicles),
+    unassigned,
+    trends: computeKpiTrends(stats, prevStats),
   };
 }

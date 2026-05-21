@@ -77,6 +77,7 @@ import {
 import {
   DEFAULT_PERIOD_FILTER,
   filterRecordsByPeriod,
+  filterRecordsByPreviousPeriod,
   isPeriodFilterActive,
   type PeriodFilterState,
 } from './utils/periodFilter';
@@ -400,6 +401,11 @@ export default function App() {
     [periodFilteredPoc, enrichedVehicles, dashboardFilters],
   );
 
+  const dashboardPocPrevious = useMemo(() => {
+    const prev = filterRecordsByPreviousPeriod(pocSourceForPeriod, periodFilter);
+    return filterPocForDashboard(prev, enrichedVehicles, dashboardFilters);
+  }, [pocSourceForPeriod, periodFilter, enrichedVehicles, dashboardFilters]);
+
   const dashboardRegionFuel = useMemo(() => {
     const cat = dashboardFilters.category;
     if (cat && cat !== 'Paliwo') return [];
@@ -419,9 +425,11 @@ export default function App() {
       dashboardRegionFuel,
       tableColumns,
       dashboardFilters,
+      dashboardPocPrevious,
     );
   }, [
     dashboardPoc,
+    dashboardPocPrevious,
     enrichedVehicles,
     enrichedCompanies,
     dashboardRegionFuel,
@@ -1516,6 +1524,7 @@ export default function App() {
             loading={vehicleCatalogLoading || companyCatalogLoading}
             period={periodFilter}
             filters={dashboardFilters}
+            onFiltersChange={setDashboardFilters}
             vehicleCount={vehicleCatalog?.totalVehicles ?? enrichedVehicles.length}
             companyCount={companyCatalog?.totalCompanies ?? enrichedCompanies.length}
           />

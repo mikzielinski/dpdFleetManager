@@ -1,3 +1,9 @@
+import type { CSSProperties } from 'react';
+import type { CategoryBreakdown } from '../services/fleetStats';
+import type { DashboardKpiTrends } from '../services/dashboardAnalytics';
+import type { RegionFuelRow } from '../services/regionFuelAnalytics';
+import type { HealthBucket } from '../services/dashboardAnalytics';
+import { barToneForValue, type BarTone } from '../utils/dashboardBarTone';
 import { SERVICE_CATEGORIES, type ServiceCategory } from '../utils/serviceCategories';
 
 export interface ChartSegment {
@@ -205,6 +211,346 @@ export function decisionSegments(
     color: palette[i % palette.length]!,
     meta: `${d.count} szt.`,
   }));
+}
+
+function toneClass(tone: BarTone): string {
+  if (tone === 'warning') return 'dash-bar-warn';
+  if (tone === 'alert') return 'dash-bar-alert';
+  return 'dash-bar-neutral';
+}
+
+function decisionColor(label: string): string {
+  const l = label.toLowerCase();
+  if (/zatwier|approv/i.test(l)) return '#2a9d8f';
+  if (/flag|anomal/i.test(l)) return '#dc0032';
+  if (/oczek|pend/i.test(l)) return '#e9c46a';
+  return '#9ca3af';
+}
+
+export function DashboardKpiRow({
+  stats,
+  trends,
+}: {
+  stats: { totalCost: number; claimCount: number; avgCost: number; flaggedCount: number };
+  trends: DashboardKpiTrends | null;
+}) {
+  const trendEl = (pct: number | null, delta?: number | null) => {
+    if (pct != null) {
+      const up = pct > 0;
+      const cls = up ? 'dash-trend-up' : pct < 0 ? 'dash-trend-down' : 'dash-trend-flat';
+      return (
+        <span className={`dash-kpi-trend ${cls}`}>
+          {up ? '↑' : pct < 0 ? '↓' : '→'} {Math.abs(pct)}% vs poprz. okres
+        </span>
+      );
+    }
+    if (delta != null && delta !== 0) {
+      return (
+        <span className={delta > 0 ? 'dash-kpi-trend dash-trend-up' : 'dash-kpi-trend dash-trend-down'}>
+          {delta > 0 ? '+' : ''}
+          {delta} vs poprz. okres
+        </span>
+      );
+    }
+    return <span className="dash-kpi-trend dash-trend-muted">brak poprz. okresu</span>;
+  };
+
+  return (
+    <div className="dash-kpi-row">
+      <div className="dash-kpi-card">
+        <span className="dash-kpi-label">Suma kosztów</span>
+        <span className="dash-kpi-value">
+          {stats.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })}
+          <span className="dash-kpi-unit"> PLN</span>
+        </span>
+        {trendEl(trends?.totalCostPct ?? null)}
+      </div>
+      <div className="dash-kpi-card">
+        <span className="dash-kpi-label">Rozliczenia</span>
+        <span className="dash-kpi-value">{stats.claimCount}</span>
+        {trendEl(trends?.claimCountPct ?? null)}
+      </div>
+      <div className="dash-kpi-card">
+        <span className="dash-kpi-label">Średni koszt</span>
+        <span className="dash-kpi-value">
+          {stats.avgCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })}
+          <span className="dash-kpi-unit"> PLN</span>
+        </span>
+        {trendEl(trends?.avgCostPct ?? null)}
+      </div>
+      <div className="dash-kpi-card dash-kpi-card-alert">
+        <span className="dash-kpi-label">Flagi / anomalie</span>
+        <span className="dash-kpi-value">{stats.flaggedCount}</span>
+        {trendEl(null, trends?.flaggedDelta ?? null)}
+      </div>
+    </div>
+  );
+}
+
+export function CategoryShareBars({
+  title,
+  items,
+}: {
+  title: string;
+  items: CategoryBreakdown[];
+}) {
+  if (!items.length) return null;
+  const total = items.reduce((s, c) => s + c.total, 0) || 1;
+  const max = Math.max(...items.map((c) => c.total), 1);
+
+  return (
+    <div className="dash-chart-card dash-chart-wide">
+      <h4 className="dash-chart-title">{title}</h4>
+      <ul className="dash-labeled-bars">
+        {items.map((c) => {
+          const meta = SERVICE_CATEGORIES.find((x) => x.id === c.category);
+          const label = meta?.label ?? c.category;
+          const pctShare = Math.round((c.total / total) * 100);
+          const pctBar = Math.round((c.total / max) * 100);
+          return (
+            <li key={c.category} className="dash-labeled-bar-row">
+              <span className="dash-labeled-bar-label">{label}</span>
+              <div className="dash-labeled-bar-track">
+                <div
+                  className="dash-labeled-bar-fill"
+                  style={{
+                    width: `${pctBar}%`,
+                    backgroundColor: meta?.color ?? '#dc0032',
+                  }}
+                />
+              </div>
+              <span className="dash-labeled-bar-end">
+                {pctShare}% · {formatPln(c.total)} PLN
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function RankBarChartToned({
+  title,
+  rows,
+  average,
+  formatValue = formatPln,
+}: {
+  title: string;
+  rows: RankRow[];
+  average: number;
+  formatValue?: (n: number) => string;
+}) {
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map((r) => r.total), 1);
+
+  return (
+    <div className="dash-chart-card">
+      <h4 className="dash-chart-title">{title}</h4>
+      <ul className="dash-labeled-bars">
+        {rows.map((r) => {
+          const pct = Math.round((r.total / max) * 100);
+          const tone = barToneForValue(r.name, r.total, average);
+          return (
+            <li key={r.name} className="dash-labeled-bar-row">
+              <span className="dash-labeled-bar-label" title={r.name}>
+                {r.name}
+              </span>
+              <div className="dash-labeled-bar-track">
+                <div
+                  className={`dash-labeled-bar-fill ${toneClass(tone)}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="dash-labeled-bar-end">
+                {r.count} · {formatValue(r.total)} PLN
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function StackedStatusBar({
+  title,
+  items,
+}: {
+  title: string;
+  items: { label: string; count: number }[];
+}) {
+  const total = items.reduce((s, x) => s + x.count, 0);
+  if (total <= 0) return null;
+
+  return (
+    <div className="dash-chart-card">
+      <h4 className="dash-chart-title">{title}</h4>
+      <div
+        className="dash-stacked-bar"
+        role="img"
+        aria-label={title}
+      >
+        {items.map((d) => {
+          const pct = (d.count / total) * 100;
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={d.label}
+              className="dash-stacked-segment"
+              style={{ width: `${pct}%`, backgroundColor: decisionColor(d.label) }}
+              title={`${d.label}: ${d.count} (${Math.round(pct)}%)`}
+            />
+          );
+        })}
+      </div>
+      <ul className="dash-stacked-legend">
+        {items.map((d) => (
+          <li key={d.label}>
+            <span className="dash-legend-swatch" style={{ backgroundColor: decisionColor(d.label) }} />
+            <span>{d.label}</span>
+            <span className="dash-legend-meta">
+              {d.count} ({Math.round((d.count / total) * 100)}%)
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function HealthGaugePanel({
+  buckets,
+  fleetAvgScore,
+}: {
+  buckets: HealthBucket[];
+  fleetAvgScore: number | null;
+}) {
+  const total = buckets.reduce((s, b) => s + b.count, 0) || 1;
+  const score = fleetAvgScore ?? 0;
+  const pct = Math.min(100, Math.max(0, score));
+  const grade =
+    score >= 80 ? 'A' : score >= 65 ? 'B' : score >= 50 ? 'C' : score >= 35 ? 'D' : 'F';
+  const gradeClass =
+    score >= 80 ? 'gauge-a' : score >= 65 ? 'gauge-b' : score >= 50 ? 'gauge-c' : 'gauge-d';
+
+  return (
+    <div className="dash-chart-card">
+      <h4 className="dash-chart-title">Health score floty</h4>
+      <div className="dash-gauge-layout">
+        <div className={`dash-gauge ${gradeClass}`} role="img" aria-label={`Średni health ${score}`}>
+          <div className="dash-gauge-meter">
+            <div className="dash-gauge-meter-fill" style={{ width: `${pct}%` } as CSSProperties} />
+          </div>
+          <div className="dash-gauge-center">
+            <span className="dash-gauge-score">{Math.round(score)}</span>
+            <span className="dash-gauge-grade">klasa {grade}</span>
+          </div>
+        </div>
+        <ul className="dash-health-list">
+          {buckets.map((b) => (
+            <li key={b.label}>
+              <span className="dash-health-grade">{b.label.split(' ')[0]}</span>
+              <span className="dash-health-count">
+                {b.count} poj. ({Math.round((b.count / total) * 100)}%)
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="dash-chart-desc">Progi: ≥80 zielony · 65–79 żółty · &lt;65 czerwony</p>
+    </div>
+  );
+}
+
+export function TopVehiclesWithAvg({
+  rows,
+  fleetAverage,
+}: {
+  rows: RankRow[];
+  fleetAverage: number;
+}) {
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map((r) => r.total), fleetAverage, 1);
+  const avgPct = Math.round((fleetAverage / max) * 100);
+
+  return (
+    <div className="dash-chart-card">
+      <h4 className="dash-chart-title">Top pojazdy (koszt)</h4>
+      <div className="dash-avg-legend">
+        <span className="dash-avg-line-swatch" />
+        Średnia floty: {formatPln(fleetAverage)} PLN
+      </div>
+      <ul className="dash-labeled-bars dash-bars-with-avg">
+        <li className="dash-avg-line-row" aria-hidden>
+          <div className="dash-labeled-bar-track">
+            <div className="dash-avg-reference" style={{ left: `${avgPct}%` }} />
+          </div>
+        </li>
+        {rows.map((r) => {
+          const pct = Math.round((r.total / max) * 100);
+          const tone = barToneForValue(r.name, r.total, fleetAverage);
+          return (
+            <li key={r.name} className="dash-labeled-bar-row">
+              <span className="dash-labeled-bar-label">{r.name}</span>
+              <div className="dash-labeled-bar-track">
+                <div
+                  className={`dash-labeled-bar-fill ${toneClass(tone)}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="dash-labeled-bar-end">{formatPln(r.total)} PLN</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
+  if (!rows.length) return null;
+  const maxCost = Math.max(...rows.map((r) => r.fuelCost), 1);
+  const maxCount = Math.max(...rows.map((r) => r.fuelCount), 1);
+
+  return (
+    <div className="dash-chart-card dash-chart-wide">
+      <h4 className="dash-chart-title">Paliwo wg regionu</h4>
+      <p className="dash-chart-desc">Dwa słupki: tankowania (szt.) i koszt PLN — łatwiej porównać skalę.</p>
+      <ul className="dash-grouped-fuel">
+        {rows.map((r) => (
+          <li key={r.region} className="dash-grouped-fuel-row">
+            <span className="dash-grouped-fuel-label">{r.region}</span>
+            <div className="dash-grouped-fuel-bars">
+              <div className="dash-grouped-pair">
+                <span className="dash-grouped-tag">tank.</span>
+                <div className="dash-grouped-track">
+                  <div
+                    className="dash-grouped-fill dash-grouped-count"
+                    style={{ width: `${Math.round((r.fuelCount / maxCount) * 100)}%` }}
+                  />
+                </div>
+                <span className="dash-grouped-val">{r.fuelCount}</span>
+              </div>
+              <div className="dash-grouped-pair">
+                <span className="dash-grouped-tag">PLN</span>
+                <div className="dash-grouped-track">
+                  <div
+                    className={`dash-grouped-fill ${barToneForValue(r.region, r.fuelCost, maxCost / rows.length) === 'alert' ? 'dash-bar-alert' : 'dash-bar-fuel'}`}
+                    style={{ width: `${Math.round((r.fuelCost / maxCost) * 100)}%` }}
+                  />
+                </div>
+                <span className="dash-grouped-val">{formatPln(r.fuelCost)}</span>
+              </div>
+            </div>
+            {r.fuelLitersPer100Km != null && (
+              <span className="dash-grouped-meta">{r.fuelLitersPer100Km.toFixed(1)} L/100 km</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function healthSegments(

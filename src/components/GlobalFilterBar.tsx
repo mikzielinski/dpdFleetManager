@@ -1,6 +1,5 @@
 import type { CompanyFilterState } from '../utils/companyFilters';
 import type { DashboardFilterState } from '../utils/dashboardFilters';
-import { isDashboardFilterActive } from '../utils/dashboardFilters';
 import type { ClaimsFilterState } from '../utils/filterRecords';
 import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 import type { VehicleFilterState } from '../utils/vehicleFilters';
@@ -92,7 +91,11 @@ export function GlobalFilterBar({
   const hasActivePeriod = isPeriodFilterActive(period);
 
   const hasActiveDashboardFilters =
-    dashboardFilters != null && isDashboardFilterActive(dashboardFilters);
+    dashboardFilters != null &&
+    (dashboardFilters.area !== '' ||
+      dashboardFilters.company !== '' ||
+      dashboardFilters.category !== '' ||
+      !dashboardFilters.hideUnassigned);
 
   return (
     <div className="global-filter-bar" role="search" aria-label="Wyszukiwanie i filtry">
@@ -205,9 +208,18 @@ export function GlobalFilterBar({
             </select>
           </label>
 
+          <label className="filter-field filter-checkbox">
+            <input
+              type="checkbox"
+              checked={dashboardFilters.hideUnassigned}
+              onChange={(e) => patchDashboard({ hideUnassigned: e.target.checked })}
+            />
+            <span>Ukryj nieprzypisane w wykresach</span>
+          </label>
+
           <p className="filter-hint">
-            Dashboard: wykresy z DPD_POC w okresie z slicera powyżej. Filtry zawężają zestaw przed
-            agregacją.
+            Dashboard zbiorczy: paski z PLN na końcu, bez donutów. „Nieprzypisany” domyślnie poza
+            rankingiem (baner u góry).
           </p>
         </div>
       ) : section === 'companies' ? (
