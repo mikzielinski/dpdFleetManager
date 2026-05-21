@@ -1,6 +1,5 @@
 import type { MonthTotal } from '../../services/dashboardAnalytics';
 import type {
-  FuelScatterPoint,
   InsightRole,
   MonthCategorySlice,
   MonthCount,
@@ -229,35 +228,6 @@ export function VehiclesWithHealthChart({
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function FuelScatterChart({ points }: { points: FuelScatterPoint[] }) {
-  if (!points.length) return null;
-  const maxCost = Math.max(...points.map((p) => p.fuelCost), 1);
-  const maxV = Math.max(...points.map((p) => p.vehicleCount), 1);
-
-  return (
-    <div className="dash-chart-card">
-      <h4 className="dash-chart-title">Paliwo: koszt vs pojazdy</h4>
-      <p className="dash-chart-desc">Pozycja w siatce = względny koszt (X) i liczba pojazdów (Y)</p>
-      <div className="insight-scatter-plot">
-        {points.map((p) => {
-          const x = 8 + Math.round((p.fuelCost / maxCost) * 84);
-          const y = 8 + Math.round((p.vehicleCount / maxV) * 84);
-          return (
-            <div
-              key={p.region}
-              className="insight-scatter-dot"
-              style={{ left: `${x}%`, bottom: `${y}%` }}
-              title={`${p.region}: ${p.fuelCost.toFixed(0)} PLN, ${p.vehicleCount} poj., ${p.drivenKm.toFixed(0)} km`}
-            >
-              <span className="insight-scatter-label">{p.region.split(' ').pop()}</span>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

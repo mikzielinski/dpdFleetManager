@@ -6,13 +6,13 @@ import {
   CategoryDistribution,
   CompaniesTable,
   CostsTrendChart,
-  FuelScatterChart,
   HealthTrendChart,
   RegionDualChart,
   RoleTags,
   SettlementBlock,
   VehiclesWithHealthChart,
 } from './InsightsCharts';
+import { GroupedFuelByRegion } from '../DashboardCharts';
 
 interface Props {
   data: InsightsData | null;
@@ -161,8 +161,8 @@ export function InsightsSection({ data, loading, period, filters, onFiltersChang
             rows={data.distribution.topVehicles}
             fleetAverage={data.dashboardBase.fleetAvgVehicleCost}
           />
-          {data.distribution.fuelScatter.length > 0 && (
-            <FuelScatterChart points={data.distribution.fuelScatter} />
+          {data.dashboardBase.fuelRegions.length > 0 && (
+            <GroupedFuelByRegion rows={data.dashboardBase.fuelRegions} />
           )}
           <SettlementBlock
             items={data.distribution.settlementStatus}

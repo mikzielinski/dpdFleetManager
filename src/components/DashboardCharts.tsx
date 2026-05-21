@@ -4,6 +4,7 @@ import type { DashboardKpiTrends } from '../services/dashboardAnalytics';
 import type { RegionFuelRow } from '../services/regionFuelAnalytics';
 import type { HealthBucket } from '../services/dashboardAnalytics';
 import { barToneForValue, type BarTone } from '../utils/dashboardBarTone';
+import { isUnassignedLabel } from '../utils/dashboardFilters';
 import { SERVICE_CATEGORIES, type ServiceCategory } from '../utils/serviceCategories';
 
 export interface ChartSegment {
@@ -508,47 +509,103 @@ export function TopVehiclesWithAvg({
   );
 }
 
-export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
-  if (!rows.length) return null;
-  const maxCost = Math.max(...rows.map((r) => r.fuelCost), 1);
-  const maxCount = Math.max(...rows.map((r) => r.fuelCount), 1);
+function FuelRegionRows({ rows, maxCost, maxCount }: { rows: RegionFuelRow[]; maxCost: number; maxCount: number }) {
+  const avgCost = rows.length ? rows.reduce((s, r) => s + r.fuelCost, 0) / rows.length : 0;
+  const maxPlnPerVehicle = Math.max(
+    ...rows.map((r) => (r.vehicleCount > 0 ? r.fuelCost / r.vehicleCount : 0)),
+    1,
+  );
 
   return (
-    <div className="dash-chart-card dash-chart-wide">
-      <h4 className="dash-chart-title">Paliwo wg regionu</h4>
-      <p className="dash-chart-desc">Dwa słupki: tankowania (szt.) i koszt PLN — łatwiej porównać skalę.</p>
-      <ul className="dash-grouped-fuel">
-        {rows.map((r) => (
-          <li key={r.region} className="dash-grouped-fuel-row">
-            <span className="dash-grouped-fuel-label">{r.region}</span>
+    <>
+      {rows.map((r) => {
+        const plnPerVehicle = r.vehicleCount > 0 ? r.fuelCost / r.vehicleCount : null;
+        const tone = barToneForValue(r.region, r.fuelCost, avgCost);
+        return (
+          <li
+            key={r.region}
+            className={isUnassignedLabel(r.region) ? 'dash-grouped-fuel-row dash-grouped-fuel-unassigned' : 'dash-grouped-fuel-row'}
+          >
+            <span className="dash-grouped-fuel-label" title={r.region}>
+              {r.region}
+            </span>
             <div className="dash-grouped-fuel-bars">
               <div className="dash-grouped-pair">
-                <span className="dash-grouped-tag">tank.</span>
+                <span className="dash-grouped-tag">Tank.</span>
                 <div className="dash-grouped-track">
                   <div
                     className="dash-grouped-fill dash-grouped-count"
                     style={{ width: `${Math.round((r.fuelCount / maxCount) * 100)}%` }}
                   />
                 </div>
-                <span className="dash-grouped-val">{r.fuelCount}</span>
+                <span className="dash-grouped-val">{r.fuelCount} szt.</span>
               </div>
               <div className="dash-grouped-pair">
                 <span className="dash-grouped-tag">PLN</span>
                 <div className="dash-grouped-track">
                   <div
-                    className={`dash-grouped-fill ${barToneForValue(r.region, r.fuelCost, maxCost / rows.length) === 'alert' ? 'dash-bar-alert' : 'dash-bar-fuel'}`}
+                    className={`dash-grouped-fill ${tone === 'alert' ? 'dash-bar-alert' : tone === 'warning' ? 'dash-bar-warn' : 'dash-bar-fuel'}`}
                     style={{ width: `${Math.round((r.fuelCost / maxCost) * 100)}%` }}
                   />
                 </div>
-                <span className="dash-grouped-val">{formatPln(r.fuelCost)}</span>
+                <span className="dash-grouped-val">{formatPln(r.fuelCost)} PLN</span>
+              </div>
+              <div className="dash-grouped-pair">
+                <span className="dash-grouped-tag">PLN/poj.</span>
+                <div className="dash-grouped-track">
+                  <div
+                    className="dash-grouped-fill dash-bar-neutral"
+                    style={{
+                      width: `${plnPerVehicle != null ? Math.round((plnPerVehicle / maxPlnPerVehicle) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="dash-grouped-val">
+                  {plnPerVehicle != null ? `${formatPln(plnPerVehicle)} PLN` : '—'}
+                </span>
               </div>
             </div>
-            {r.fuelLitersPer100Km != null && (
-              <span className="dash-grouped-meta">{r.fuelLitersPer100Km.toFixed(1)} L/100 km</span>
-            )}
+            <span className="dash-grouped-meta">
+              {r.vehicleCount} poj.
+              {r.fuelLitersPer100Km != null ? ` · ${r.fuelLitersPer100Km.toFixed(1)} L/100 km` : ''}
+              {r.drivenKm > 0 ? ` · ${r.drivenKm.toFixed(0)} km` : ''}
+            </span>
           </li>
-        ))}
+        );
+      })}
+    </>
+  );
+}
+
+export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
+  if (!rows.length) return null;
+
+  const assigned = rows.filter((r) => !isUnassignedLabel(r.region));
+  const unassigned = rows.filter((r) => isUnassignedLabel(r.region));
+
+  const maxCostAssigned = Math.max(...assigned.map((r) => r.fuelCost), 1);
+  const maxCountAssigned = Math.max(...assigned.map((r) => r.fuelCount), 1);
+  const maxCostAll = Math.max(...rows.map((r) => r.fuelCost), 1);
+  const maxCountAll = Math.max(...rows.map((r) => r.fuelCount), 1);
+
+  return (
+    <div className="dash-chart-card dash-chart-wide">
+      <h4 className="dash-chart-title">Paliwo wg regionu</h4>
+      <p className="dash-chart-desc">
+        Ranking poziomy: tankowania, suma PLN i PLN na pojazd. Skala osobno dla regionów przypisanych
+        (bez rozciągania przez „Nieprzypisany”).
+      </p>
+      <ul className="dash-grouped-fuel">
+        <FuelRegionRows rows={assigned} maxCost={maxCostAssigned} maxCount={maxCountAssigned} />
       </ul>
+      {unassigned.length > 0 && (
+        <>
+          <p className="dash-grouped-unassigned-head">Nieprzypisany (osobna skala)</p>
+          <ul className="dash-grouped-fuel dash-grouped-fuel-unassigned-block">
+            <FuelRegionRows rows={unassigned} maxCost={maxCostAll} maxCount={maxCountAll} />
+          </ul>
+        </>
+      )}
     </div>
   );
 }

@@ -1829,6 +1829,30 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   font-weight: 700;
   font-size: 12px;
   margin-bottom: 8px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.dash-grouped-fuel-unassigned {
+  background: #fffbf0;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.dash-grouped-unassigned-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #996600;
+  margin: 14px 0 8px;
+}
+
+.dash-grouped-fuel-unassigned-block {
+  border: 1px dashed #e9c46a;
+  border-radius: 8px;
+  padding: 8px;
 }
 
 .dash-grouped-fuel-bars {
