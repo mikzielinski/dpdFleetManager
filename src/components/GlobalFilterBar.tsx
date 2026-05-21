@@ -6,7 +6,7 @@ import type { VehicleFilterState } from '../utils/vehicleFilters';
 import { PeriodFilterRow } from './PeriodFilterRow';
 import { isPeriodFilterActive, type PeriodFilterState } from '../utils/periodFilter';
 
-type MainSection = 'claims' | 'vehicles' | 'companies' | 'dashboard';
+type MainSection = 'claims' | 'vehicles' | 'companies' | 'dashboard' | 'insights';
 
 interface Props {
   section: MainSection;
@@ -136,10 +136,10 @@ export function GlobalFilterBar({
               {' '}
               z <strong>{totalCount}</strong> pojazdów B2B
             </>
-          ) : section === 'dashboard' ? (
+          ) : section === 'dashboard' || section === 'insights' ? (
             <>
               {' '}
-              · <strong>{filteredCount}</strong> rozliczeń w wykresach
+              · <strong>{filteredCount}</strong> rozliczeń w okresie
             </>
           ) : section === 'companies' ? (
             <>
@@ -157,7 +157,9 @@ export function GlobalFilterBar({
         </span>
       </div>
 
-      {section === 'dashboard' && dashboardFilters && onDashboardFiltersChange ? (
+      {(section === 'dashboard' || section === 'insights') &&
+      dashboardFilters &&
+      onDashboardFiltersChange ? (
         <div className="global-filter-controls">
           <label className="filter-field">
             <span className="filter-label">Region</span>
@@ -218,8 +220,9 @@ export function GlobalFilterBar({
           </label>
 
           <p className="filter-hint">
-            Dashboard zbiorczy: paski z PLN na końcu, bez donutów. „Nieprzypisany” domyślnie poza
-            rankingiem (baner u góry).
+            {section === 'insights'
+              ? 'Insights: alerty, KPI z trendem, trendy 6 mies. i rozkład kosztów.'
+              : 'Dashboard zbiorczy: paski z PLN na końcu. „Nieprzypisany” domyślnie poza rankingiem.'}
           </p>
         </div>
       ) : section === 'companies' ? (

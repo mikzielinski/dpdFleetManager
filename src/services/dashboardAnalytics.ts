@@ -93,7 +93,7 @@ function filterNamedRows(rows: NamedTotal[], hideUnassigned: boolean): NamedTota
   return rows.filter((r) => !isUnassignedLabel(r.name));
 }
 
-function computeUnassignedSummary(
+export function computeUnassignedSummary(
   poc: DpdRecord[],
   vehicles: VehicleCatalogItem[],
 ): UnassignedSummary {

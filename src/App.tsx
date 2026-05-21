@@ -19,6 +19,7 @@ import {
 import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
 import { DashboardSection } from './components/DashboardSection';
+import { InsightsSection } from './components/insights/InsightsSection';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import { SortableTh } from './components/SortableTh';
@@ -93,6 +94,7 @@ import {
   buildDashboardData,
   filterPocForDashboard,
 } from './services/dashboardAnalytics';
+import { buildInsightsData, pocForInsights } from './services/insightsAnalytics';
 import { getClaimSortValue } from './utils/claimSort';
 import { sortArray, toggleSort, EMPTY_SORT, type SortState } from './utils/tableSort';
 import {
@@ -149,9 +151,9 @@ export default function App() {
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
 
-  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies' | 'dashboard'>(
-    'claims',
-  );
+  const [mainSection, setMainSection] = useState<
+    'claims' | 'vehicles' | 'companies' | 'dashboard' | 'insights'
+  >('claims');
   const [claimsSort, setClaimsSort] = useState<SortState>(EMPTY_SORT);
   const [vehicleSort, setVehicleSort] = useState<
     SortState<'registration' | 'area' | 'company' | 'health' | 'cost' | 'poc'>
@@ -406,6 +408,16 @@ export default function App() {
     return filterPocForDashboard(prev, enrichedVehicles, dashboardFilters);
   }, [pocSourceForPeriod, periodFilter, enrichedVehicles, dashboardFilters]);
 
+  const insightsPoc = useMemo(
+    () => pocForInsights(periodFilteredPoc, enrichedVehicles, dashboardFilters),
+    [periodFilteredPoc, enrichedVehicles, dashboardFilters],
+  );
+
+  const insightsPocPrevious = useMemo(() => {
+    const prev = filterRecordsByPreviousPeriod(pocSourceForPeriod, periodFilter);
+    return pocForInsights(prev, enrichedVehicles, dashboardFilters);
+  }, [pocSourceForPeriod, periodFilter, enrichedVehicles, dashboardFilters]);
+
   const dashboardRegionFuel = useMemo(() => {
     const cat = dashboardFilters.category;
     if (cat && cat !== 'Paliwo') return [];
@@ -436,6 +448,29 @@ export default function App() {
     tableColumns,
     dashboardFilters,
     periodFilteredPoc.length,
+  ]);
+
+  const insightsData = useMemo(() => {
+    if (!insightsPoc.length && !enrichedVehicles.length) return null;
+    return buildInsightsData(
+      insightsPoc,
+      insightsPocPrevious,
+      pocSourceForPeriod,
+      enrichedVehicles,
+      enrichedCompanies,
+      dashboardRegionFuel,
+      tableColumns,
+      dashboardFilters,
+    );
+  }, [
+    insightsPoc,
+    insightsPocPrevious,
+    pocSourceForPeriod,
+    enrichedVehicles,
+    enrichedCompanies,
+    dashboardRegionFuel,
+    tableColumns,
+    dashboardFilters,
   ]);
 
   const activeVehicleFuelStats = useMemo(() => {
@@ -578,7 +613,11 @@ export default function App() {
   }, [periodFilterActive, isAuthenticated, ensurePocCostsLoaded]);
 
   useEffect(() => {
-    if ((mainSection !== 'vehicles' && mainSection !== 'dashboard') || !isAuthenticated) return;
+    if (
+      (mainSection !== 'vehicles' && mainSection !== 'dashboard' && mainSection !== 'insights') ||
+      !isAuthenticated
+    )
+      return;
     if (vehicleCatalog || vehicleCatalogLoading) return;
     void loadVehicleTabData();
   }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
@@ -617,7 +656,8 @@ export default function App() {
   }, [sdk, isAuthenticated, vehicleCatalog]);
 
   useEffect(() => {
-    if (mainSection !== 'companies' && mainSection !== 'dashboard') return;
+    if (mainSection !== 'companies' && mainSection !== 'dashboard' && mainSection !== 'insights')
+      return;
     if (!isAuthenticated || companyCatalog || companyCatalogLoading) return;
     void loadCompanyTabData();
   }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
@@ -936,6 +976,13 @@ export default function App() {
         </button>
         <button
           type="button"
+          className={mainSection === 'insights' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('insights')}
+        >
+          Insights
+        </button>
+        <button
+          type="button"
           className="main-nav-btn main-nav-btn-report"
           title="Podsumowanie floty PDF"
           onClick={() => {
@@ -972,7 +1019,9 @@ export default function App() {
               ? sortedFilteredVehicles.length
               : mainSection === 'dashboard'
                 ? dashboardPoc.length
-                : filteredCompanies.length
+                : mainSection === 'insights'
+                  ? insightsPoc.length
+                  : filteredCompanies.length
         }
         totalCount={
           mainSection === 'claims'
@@ -1527,6 +1576,14 @@ export default function App() {
             onFiltersChange={setDashboardFilters}
             vehicleCount={vehicleCatalog?.totalVehicles ?? enrichedVehicles.length}
             companyCount={companyCatalog?.totalCompanies ?? enrichedCompanies.length}
+          />
+        ) : mainSection === 'insights' ? (
+          <InsightsSection
+            data={insightsData}
+            loading={vehicleCatalogLoading || companyCatalogLoading}
+            period={periodFilter}
+            filters={dashboardFilters}
+            onFiltersChange={setDashboardFilters}
           />
         ) : (
           <CompaniesSection

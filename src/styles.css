@@ -1884,3 +1884,310 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   font-weight: 700;
   margin: 0;
 }
+
+/* —— Insights —— */
+.insights-panel {
+  padding: 16px 20px 24px;
+}
+
+.insights-layer {
+  margin-bottom: 28px;
+}
+
+.insights-layer-head h3 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: #222;
+}
+
+.insights-layer-head p {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 14px;
+}
+
+.insights-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.insight-alert {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e8e8e6;
+  border-radius: 10px;
+  border-left: 4px solid #e9c46a;
+}
+
+.insight-alert-flag {
+  border-left-color: #dc0032;
+}
+
+.insight-alert-clock {
+  border-left-color: #6c757d;
+}
+
+.insight-alert-car {
+  border-left-color: #0077b6;
+}
+
+.insight-alert-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.insight-alert-body h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.insight-alert-body p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #555;
+}
+
+.insight-alert-metric {
+  font-weight: 700;
+  font-size: 13px;
+  color: #222 !important;
+}
+
+.insights-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.insight-kpi-card {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e8e8e6;
+  border-radius: 10px;
+}
+
+.insight-kpi-card-warn {
+  border-color: #f5c6cb;
+  background: #fffafa;
+}
+
+.insight-kpi-sub {
+  font-size: 12px;
+  color: #888;
+  margin: 6px 0 8px;
+}
+
+.insight-budget-progress {
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+
+.insight-budget-progress-fill {
+  height: 100%;
+  background: #dc0032;
+  border-radius: 4px;
+  max-width: 100%;
+}
+
+.insight-budget-progress-label {
+  font-size: 11px;
+  color: #888;
+}
+
+.insight-role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.insight-role {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.insight-role-manager {
+  background: #ede7f6;
+  color: #5e35b1;
+}
+
+.insight-role-finance {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.insight-role-board {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.insight-empty {
+  font-size: 13px;
+  color: #888;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.insight-trend-columns {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.insight-trend-col {
+  flex: 0 0 72px;
+  text-align: center;
+}
+
+.insight-trend-col-bars {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.insight-budget-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed #888;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.insight-trend-stack {
+  width: 48px;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+  min-height: 4px;
+}
+
+.insight-trend-stack-seg {
+  width: 100%;
+  min-height: 2px;
+}
+
+.insight-health-trend {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.insight-health-col {
+  flex: 1;
+  text-align: center;
+  min-width: 48px;
+}
+
+.insight-health-stack {
+  height: 100px;
+  width: 40px;
+  margin: 0 auto 6px;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #eee;
+}
+
+.insight-health-a {
+  background: #2a9d8f;
+  min-height: 2px;
+}
+
+.insight-health-b {
+  background: #52b788;
+  min-height: 2px;
+}
+
+.insight-health-c {
+  background: #e9c46a;
+  min-height: 2px;
+}
+
+.insight-dual-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.insight-dual-secondary .dash-labeled-bar-fill {
+  opacity: 0.75;
+}
+
+.insight-scatter-plot {
+  position: relative;
+  height: 200px;
+  background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
+  border: 1px solid #e8e8e6;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.insight-scatter-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-bottom: -6px;
+  border-radius: 50%;
+  background: #e85d04;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.insight-scatter-label {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  white-space: nowrap;
+  color: #444;
+  font-weight: 600;
+}
+
+.insight-vehicle-health-list {
+  list-style: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  font-size: 12px;
+}
+
+.insight-vehicle-health-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.insight-pending-age {
+  font-size: 12px;
+  color: #c1121f;
+  margin: 10px 0 0;
+}
+
+.insights-toggle {
+  margin-top: 12px;
+}
+
+.insight-muted {
+  color: #aaa;
+}
