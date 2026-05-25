@@ -22,9 +22,9 @@ git clone https://github.com/mikzielinski/dpdFleetManager.git
 cd dpdFleetManager
 copy .env.example .env
 npm install
-uip login --organization mzpocevylrxu --tenant DefaultTenant
+npm run login:staging
 npm run build
-.\.uipath\deploy-dpdmonitoring.ps1 1.1.0
+npm run deploy:staging
 ```
 
 Aplikacja: https://mzpocevylrxu.staging.uipath.host/dpdmonitoring/

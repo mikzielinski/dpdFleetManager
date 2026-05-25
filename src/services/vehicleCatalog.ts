@@ -16,7 +16,7 @@ import {
   resolveRelationshipLabel,
   resolveSchemaFieldName,
 } from '../utils/entityFields';
-import { extractVehicleCompliance, type VehicleCompliance } from '../utils/vehicleCompliance';
+import { resolveVehicleCompliance, type VehicleCompliance } from '../utils/vehicleCompliance';
 import type { HealthGrade } from '../utils/healthScore';
 import { normalizeDpdRecord, normalizeRegistration, registrationsMatch, type DpdRecord } from '../utils/record';
 import { BYPASS_AUTH } from './demoData';
@@ -388,7 +388,7 @@ async function resolveEntityByNames(
 }
 
 function mockVehicleCatalog(): VehicleCatalogData {
-  const vehicles: VehicleCatalogItem[] = [
+  const specs: Omit<VehicleCatalogItem, 'compliance'>[] = [
     {
       id: 'v1',
       registration: 'WR145DPD',
@@ -398,19 +398,44 @@ function mockVehicleCatalog(): VehicleCatalogData {
     },
     {
       id: 'v2',
-      registration: 'WA 12345',
-      areaLabel: 'Warszawa — Mokotów',
-      companyLabel: 'DPD Express',
-      raw: { Id: 'v2', CarRegistration: 'WA 12345' },
+      registration: 'WR136DPD',
+      areaLabel: 'Wrocław Południe',
+      companyLabel: 'LogiTrans Partner Sp. z o.o.',
+      raw: { Id: 'v2', CarRegistration: 'WR136DPD' },
     },
     {
       id: 'v3',
-      registration: 'KR 98765',
-      areaLabel: 'Kraków — Północ',
-      companyLabel: 'Orlen Fleet',
-      raw: { Id: 'v3', CarRegistration: 'KR 98765' },
+      registration: 'DW7855U',
+      areaLabel: 'Dolnośląskie',
+      companyLabel: 'FleetLine B2B Services',
+      raw: { Id: 'v3', CarRegistration: 'DW7855U' },
+    },
+    {
+      id: 'v4',
+      registration: 'DW2048O',
+      areaLabel: 'Dolnośląskie',
+      companyLabel: 'Kurier Express Dolny Śląsk',
+      raw: { Id: 'v4', CarRegistration: 'DW2048O' },
+    },
+    {
+      id: 'v5',
+      registration: 'DW2905K',
+      areaLabel: 'Wrocław',
+      companyLabel: 'Trans-Hex Kurier B2B Sp. z o.o.',
+      raw: { Id: 'v5', CarRegistration: 'DW2905K' },
+    },
+    {
+      id: 'v6',
+      registration: 'WR117DPD',
+      areaLabel: 'Wrocław',
+      companyLabel: 'Auto Partner Flota B2B',
+      raw: { Id: 'v6', CarRegistration: 'WR117DPD' },
     },
   ];
+  const vehicles: VehicleCatalogItem[] = specs.map((v) => ({
+    ...v,
+    compliance: resolveVehicleCompliance(v.raw, v.registration),
+  }));
   const areaOptions = [...new Set(vehicles.map((v) => v.areaLabel).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, 'pl'),
   );
@@ -548,7 +573,7 @@ export async function loadVehicleCatalog(
       areaLabel: blankLabel(areaLabel),
       companyLabel: blankLabel(companyLabel),
       raw: row,
-      compliance: extractVehicleCompliance(row, reg, vehiclesEntity),
+      compliance: resolveVehicleCompliance(row, reg, vehiclesEntity),
     };
   });
 

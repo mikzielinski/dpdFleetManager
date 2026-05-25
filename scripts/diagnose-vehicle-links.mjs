@@ -1,22 +1,19 @@
 /**
  * Diagnostyka: czy puste Region/Firma to błąd aplikacji czy brak powiązań w Data Fabric.
  *
- * Wymaga: uip login --organization mzpocevylrxu --tenant DefaultTenant \
- *   --authority https://staging.uipath.com/identity_
+ * Wymaga: npm run login:staging
  *
- * Uruchom: node scripts/diagnose-vehicle-links.mjs
+ * Uruchom: npm run diagnose:links
  */
 import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import {
+  loadStagingDeployConfig,
+  REPO_ROOT,
+  requireStagingAuth,
+} from './uipath-staging-auth.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '..');
-const cfg = JSON.parse(
-  fs.readFileSync(path.join(root, '.uipath', 'deploy-config.staging.json'), 'utf8'),
-);
-const authFile = path.join(os.homedir(), '.uipath', '.auth');
+const root = REPO_ROOT;
+const cfg = loadStagingDeployConfig(root);
 
 const ENTITY_NAMES = {
   vehicles: ['DPDB2BVehicles', 'DPD_B2B_Vehicles'],
@@ -26,20 +23,6 @@ const ENTITY_NAMES = {
 };
 
 const POC_ENTITY_ID = '4e2e38d9-bf4a-f111-8ef3-000d3a261acd';
-
-function parseAuth(file) {
-  const map = Object.fromEntries(
-    fs
-      .readFileSync(file, 'utf8')
-      .split(/\r?\n/)
-      .filter((l) => l.includes('='))
-      .map((l) => {
-        const i = l.indexOf('=');
-        return [l.slice(0, i), l.slice(i + 1)];
-      }),
-  );
-  return map.UIPATH_ACCESS_TOKEN;
-}
 
 function normalizeKey(name) {
   return String(name ?? '')
@@ -191,15 +174,7 @@ function printVerdict(label, analysis) {
 }
 
 async function main() {
-  if (!fs.existsSync(authFile)) {
-    console.error(`Brak ${authFile} — zaloguj się przez uip login (staging).`);
-    process.exit(1);
-  }
-  const token = parseAuth(authFile);
-  if (!token) {
-    console.error('Brak UIPATH_ACCESS_TOKEN w .auth');
-    process.exit(1);
-  }
+  const { accessToken: token } = requireStagingAuth(cfg);
 
   console.log(`API: ${apiRoot}datafabric_/api/Entity`);
   console.log('Pobieram metadane encji…');

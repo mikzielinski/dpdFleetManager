@@ -30,10 +30,12 @@ npm run preview  # podgląd buildu lokalnie
 ## Deploy (UiPath)
 
 ```powershell
-uip login --organization mzpocevylrxu --tenant DefaultTenant
+# STAGING — wymagane --authority (bez tego otwiera cloud.uipath.com)
+npm run login:staging
 
-# Staging (domyślnie)
-.\.uipath\deploy-dpdmonitoring.ps1 1.1.0
+# Staging deploy
+npm run deploy:staging
+# lub: .\.uipath\deploy-dpdmonitoring.ps1 1.1.0
 
 # Production (po przygotowaniu deploy-config.production.json)
 .\.uipath\deploy-dpdmonitoring.ps1 1.0.0 -Environment production

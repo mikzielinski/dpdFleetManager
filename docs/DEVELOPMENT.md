@@ -35,11 +35,18 @@ Zmienne `VITE_*` są **wbudowywane w bundle** przy `npm run build`.
 ## Logowanie CLI
 
 ```powershell
-# Staging (wymagane — bez --authority loguje na cloud.uipath.com)
+# Staging (ZAWSZE — bez --authority CLI otwiera cloud.uipath.com)
+npm run login:staging
+
+# Ręcznie:
 uip logout
 uip login --organization mzpocevylrxu --tenant DefaultTenant --authority https://staging.uipath.com/identity_
 
-# Production (po migracji)
+# Diagnostyka Data Fabric (po login:staging)
+npm run diagnose:fabric
+npm run diagnose:links
+
+# Production (po migracji — inny portal)
 uip login --organization <org-name> --tenant <tenant-name>
 ```
 

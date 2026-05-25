@@ -1,7 +1,11 @@
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
+import { getDemoFleetCompliance } from '../data/demoFleetCases';
 import { resolveSchemaFieldName } from './entityFields';
 import type { DpdRecord } from './record';
-import { normalizeRegistration } from './record';
+
+/** Uzupełnij compliance gdy Fabric nie ma pól (staging). Wyłącz: VITE_STAGING_COMPLIANCE_ENRICH=false */
+export const STAGING_COMPLIANCE_ENRICH_ENABLED =
+  import.meta.env.VITE_STAGING_COMPLIANCE_ENRICH !== 'false';
 
 export type ComplianceStatus = 'ok' | 'due_soon' | 'expired' | 'unknown';
 
@@ -16,7 +20,7 @@ export interface InsurancePolicyInfo {
 
 export interface VehicleCompliance {
   mileageKm: number | null;
-  mileageSource: 'fabric' | 'estimated' | 'missing';
+  mileageSource: 'fabric' | 'missing';
   inspectionValidUntil: string | null;
   inspectionStatus: ComplianceStatus;
   policies: InsurancePolicyInfo[];
@@ -25,6 +29,8 @@ export interface VehicleCompliance {
 
 const MILEAGE_FIELDS = [
   'Mileage',
+  'MileageKM',
+  'MileageKm',
   'Odometer',
   'Przebieg',
   'CurrentMileage',
@@ -80,23 +86,10 @@ export function complianceStatusForDate(isoDate: string | null, soonDays = 30): 
   return 'ok';
 }
 
-function stableDaysFromSeed(seed: string, minDays: number, maxDays: number): number {
-  const s = normalizeRegistration(seed);
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return minDays + (h % (maxDays - minDays + 1));
-}
-
-function addDaysIso(base: Date, days: number): string {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Dane z encji B2B lub estymata deterministyczna (staging bez pól compliance). */
+/** Pola compliance wyłącznie z encji DPD_B2B_Vehicles (Data Fabric). */
 export function extractVehicleCompliance(
   row: DpdRecord,
-  registration: string,
+  _registration: string,
   entity?: EntityGetResponse | null,
 ): VehicleCompliance {
   const mileageField =
@@ -108,11 +101,8 @@ export function extractVehicleCompliance(
     mileageKm = parseMileage(row[f]);
   }
 
-  let mileageSource: VehicleCompliance['mileageSource'] = mileageKm != null ? 'fabric' : 'missing';
-  if (mileageKm == null && registration) {
-    mileageKm = 40_000 + stableDaysFromSeed(registration, 0, 180_000);
-    mileageSource = 'estimated';
-  }
+  const mileageSource: VehicleCompliance['mileageSource'] =
+    mileageKm != null ? 'fabric' : 'missing';
 
   let inspectionValidUntil: string | null = null;
   const inspField =
@@ -131,10 +121,6 @@ export function extractVehicleCompliance(
       validUntil = parseDateLoose(row[f]);
       if (validUntil) break;
     }
-    if (!validUntil && mileageSource === 'estimated') {
-      const offset = spec.type === 'OC' ? 120 : spec.type === 'AC' ? 200 : 90;
-      validUntil = addDaysIso(new Date(), stableDaysFromSeed(registration + spec.type, -30, offset));
-    }
     const status = complianceStatusForDate(validUntil);
     policies.push({
       type: spec.type,
@@ -142,13 +128,6 @@ export function extractVehicleCompliance(
       status,
       label: spec.type,
     });
-  }
-
-  if (!inspectionValidUntil && mileageSource === 'estimated') {
-    inspectionValidUntil = addDaysIso(
-      new Date(),
-      stableDaysFromSeed(registration + 'insp', -60, 365),
-    );
   }
 
   const inspectionStatus = complianceStatusForDate(inspectionValidUntil);
@@ -167,5 +146,47 @@ export function extractVehicleCompliance(
     inspectionStatus,
     policies,
     complianceIssues,
+  };
+}
+
+function policiesComplete(c: VehicleCompliance): boolean {
+  return c.policies.length > 0 && c.policies.every((p) => p.validUntil != null);
+}
+
+function mergeComplianceIssues(fabric: VehicleCompliance, enriched: VehicleCompliance): string[] {
+  const set = new Set([...fabric.complianceIssues, ...enriched.complianceIssues]);
+  return [...set];
+}
+
+/** Fabric + uzupełnienie brakujących pól (ubezpieczenia, badanie, przebieg) na stagingu. */
+export function resolveVehicleCompliance(
+  row: DpdRecord,
+  registration: string,
+  entity?: EntityGetResponse | null,
+): VehicleCompliance {
+  const fabric = extractVehicleCompliance(row, registration, entity);
+  if (!STAGING_COMPLIANCE_ENRICH_ENABLED || !registration.trim()) return fabric;
+
+  const enriched = getDemoFleetCompliance(registration);
+  const usePolicies = policiesComplete(fabric) ? fabric.policies : enriched.policies;
+  const useInspection = fabric.inspectionValidUntil
+    ? fabric.inspectionValidUntil
+    : enriched.inspectionValidUntil;
+  const inspectionStatus = fabric.inspectionValidUntil
+    ? fabric.inspectionStatus
+    : enriched.inspectionStatus;
+
+  const usedEnriched =
+    !policiesComplete(fabric) || !fabric.inspectionValidUntil || fabric.mileageKm == null;
+
+  return {
+    mileageKm: fabric.mileageKm ?? enriched.mileageKm,
+    mileageSource: fabric.mileageKm != null ? 'fabric' : enriched.mileageSource,
+    inspectionValidUntil: useInspection,
+    inspectionStatus,
+    policies: usePolicies,
+    complianceIssues: usedEnriched
+      ? mergeComplianceIssues(fabric, enriched)
+      : fabric.complianceIssues,
   };
 }

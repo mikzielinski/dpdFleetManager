@@ -1,0 +1,247 @@
+import type { DpdRecord } from '../utils/record';
+import { normalizeRegistration } from '../utils/record';
+import { getDemoCaseTag, getDemoFleetCompliance } from './demoFleetCases';
+export interface PocBoostVehicle {
+  registration: string;
+}
+
+/**
+ * Dodatkowe koszty POC przy małej liczbie rekordów w Fabric (staging).
+ * Wyłącz: VITE_STAGING_POC_ENRICH=false
+ */
+export const STAGING_POC_ENRICH_ENABLED =
+  import.meta.env.VITE_STAGING_POC_ENRICH !== 'false';
+
+/** @deprecated użyj STAGING_POC_ENRICH_ENABLED */
+export const DEMO_POC_BOOST_ENABLED = STAGING_POC_ENRICH_ENABLED;
+
+type PocTemplate = {
+  serviceName: string;
+  serviceType?: string;
+  companyName: string;
+  netPrice: number;
+  decision: string;
+  flagType?: string;
+  fraudFlag?: string;
+  fleetManagerNote?: string;
+};
+
+const VENDORS = {
+  fuel: ['Circle K', 'Shell', 'Orlen', 'BP Express'],
+  toll: ['Autopay', 'ViaTOLL', 'A1 Opłaty'],
+  repair: ['Auto Serwis Wrocław', 'Moto-Fix', 'Quick Tire Service'],
+  inspection: ['Stacja Kontroli Pojazdów', 'SKP Wrocław Południe'],
+  wash: ['Myjnia Flota', 'Clean Truck'],
+};
+
+function pick<T>(arr: T[], seed: number): T {
+  return arr[seed % arr.length]!;
+}
+
+function templatesForTag(tag: ReturnType<typeof getDemoCaseTag>): PocTemplate[] {
+  switch (tag) {
+    case 'fraud':
+      return [
+        {
+          serviceName: 'Vehicle Repair',
+          companyName: pick(VENDORS.repair, 1),
+          netPrice: 4850,
+          decision: 'Flagged',
+          flagType: 'Kwota 4× powyżej mediany floty',
+          fraudFlag: 'true',
+          fleetManagerNote: 'Podejrzana faktura — duplikat NIP w 14 dni.',
+        },
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 0),
+          netPrice: 420,
+          decision: 'Oczekuje',
+        },
+        {
+          serviceName: 'Toll Road Charge',
+          companyName: pick(VENDORS.toll, 0),
+          netPrice: 180,
+          decision: 'Zatwierdzono',
+        },
+      ];
+    case 'high_cost':
+      return [
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 2),
+          netPrice: 890,
+          decision: 'Oczekuje',
+        },
+        {
+          serviceName: 'Toll Road Charge',
+          companyName: pick(VENDORS.toll, 1),
+          netPrice: 620,
+          decision: 'Zatwierdzono',
+        },
+        {
+          serviceName: 'Vehicle Repair',
+          companyName: pick(VENDORS.repair, 0),
+          netPrice: 2100,
+          decision: 'Do weryfikacji',
+          flagType: 'Koszt serwisu powyżej limitu',
+        },
+      ];
+    case 'mot_expired':
+    case 'insurance_expired':
+    case 'mot_due_soon':
+      return [
+        {
+          serviceName: 'Vehicle Inspection',
+          companyName: pick(VENDORS.inspection, 0),
+          netPrice: 189,
+          decision: 'Zatwierdzono',
+        },
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 1),
+          netPrice: 310,
+          decision: 'Zatwierdzono',
+        },
+      ];
+    default:
+      return [
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 0),
+          netPrice: 245,
+          decision: 'Zatwierdzono',
+        },
+        {
+          serviceName: 'Toll Road Charge',
+          companyName: pick(VENDORS.toll, 1),
+          netPrice: 178,
+          decision: 'Zatwierdzono',
+        },
+        {
+          serviceName: 'Car Wash',
+          companyName: pick(VENDORS.wash, 0),
+          netPrice: 55,
+          decision: 'Zatwierdzono',
+        },
+        {
+          serviceName: 'Fuel Expense',
+          companyName: pick(VENDORS.fuel, 2),
+          netPrice: 312,
+          decision: 'Oczekuje',
+        },
+      ];
+  }
+}
+
+const EXTRA_BY_PLATE: PocTemplate[] = [
+  {
+    serviceName: 'Fuel Expense',
+    companyName: 'Orlen',
+    netPrice: 268,
+    decision: 'Zatwierdzono',
+  },
+  {
+    serviceName: 'Toll Road Charge',
+    companyName: 'Autopay',
+    netPrice: 142,
+    decision: 'Zatwierdzono',
+  },
+  {
+    serviceName: 'Parking',
+    companyName: 'DPD Hub Parking',
+    netPrice: 38,
+    decision: 'Zatwierdzono',
+  },
+];
+
+function expandedTemplates(plate: string, tag: ReturnType<typeof getDemoCaseTag>): PocTemplate[] {
+  const base = templatesForTag(tag);
+  const h = plate.length % EXTRA_BY_PLATE.length;
+  return [...base, ...EXTRA_BY_PLATE.slice(h), ...EXTRA_BY_PLATE.slice(0, h)].slice(0, 8);
+}
+
+function estimatedOdometerAt(plate: string, daysAgo: number): number {
+  const end = getDemoFleetCompliance(plate).mileageKm ?? 120_000;
+  const monthly = 1200 + (normalizeRegistration(plate).length % 600);
+  return Math.max(8000, Math.round(end - (daysAgo / 28) * monthly));
+}
+
+function existingCountForPlate(allPoc: DpdRecord[], plate: string): number {
+  const key = normalizeRegistration(plate);
+  return allPoc.filter((r) => {
+    const reg = String(r.CarRegistration ?? r.carRegistration ?? '');
+    return normalizeRegistration(reg) === key;
+  }).length;
+}
+
+/**
+ * Dodatkowe rozliczenia POC dla pojazdów bez kosztów (lub mało) — pełne demo statystyk.
+ * Nie zastępuje rekordów z Data Fabric.
+ */
+export function generateStagingDemoPocRecords(
+  vehicles: PocBoostVehicle[],
+  existingPoc: DpdRecord[],
+): DpdRecord[] {
+  const out: DpdRecord[] = [];
+  let seq = 9000;
+
+  for (const v of vehicles) {
+    const plate = v.registration;
+    if (!plate) continue;
+    const have = existingCountForPlate(existingPoc, plate);
+    const tag = getDemoCaseTag(plate);
+    const templates = expandedTemplates(plate, tag);
+    const targetMin = 6;
+    const want = Math.max(0, Math.min(templates.length, targetMin - have));
+
+    for (let i = 0; i < want; i++) {
+      const t = templates[i]!;
+      seq += 1;
+      const daysAgo = (seq % 75) + i * 3 + (plate.length % 20);
+      const serviceDate = new Date();
+      serviceDate.setDate(serviceDate.getDate() - daysAgo);
+      const dateIso = serviceDate.toISOString().slice(0, 10);
+      const odometerKm = estimatedOdometerAt(plate, daysAgo);
+      const isMileageReport = i === 0;
+      out.push({
+        Id: `demo-boost-${seq}`,
+        CarRegistration: plate,
+        Date: dateIso,
+        ServiceDate: dateIso,
+        ServiceName: isMileageReport ? 'Raport przebiegu kierowcy' : t.serviceName,
+        ServiceType: isMileageReport ? 'Mileage Report' : (t.serviceType ?? t.serviceName),
+        CompanyName: t.companyName,
+        TaxID: `899${String(seq).padStart(7, '0')}`.slice(0, 10),
+        NetPrice: isMileageReport ? 0 : t.netPrice,
+        Amount: isMileageReport ? 1 : 1,
+        Mileage: odometerKm,
+        Przebieg: odometerKm,
+        Status: t.decision,
+        decision: t.decision,
+        FlagType: t.flagType ?? '',
+        FraudFlag: t.fraudFlag ?? '',
+        FleetManagerNote: t.fleetManagerNote ?? '',
+      });
+    }
+  }
+
+  return out;
+}
+
+/** Dołącza syntetyczne POC do listy kosztów (statystyki, health score, filtry). */
+export function appendDemoPocBoost(
+  vehicles: PocBoostVehicle[],
+  pocItems: DpdRecord[],
+): DpdRecord[] {
+  if (!STAGING_POC_ENRICH_ENABLED || !vehicles.length) return pocItems;
+  const extra = generateStagingDemoPocRecords(vehicles, pocItems);
+  return extra.length ? [...pocItems, ...extra] : pocItems;
+}
+
+/** Dołącza syntetyczne POC tylko gdy VITE_DEMO_POC_BOOST=true. */
+export function applyPocDatasetPolicy(
+  vehicles: PocBoostVehicle[],
+  pocItems: DpdRecord[],
+): DpdRecord[] {
+  return appendDemoPocBoost(vehicles, pocItems);
+}

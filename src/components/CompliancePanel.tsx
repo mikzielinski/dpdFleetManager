@@ -23,11 +23,9 @@ function statusClass(status: string): string {
 
 export function CompliancePanel({ compliance }: Props) {
   const mileageNote =
-    compliance.mileageSource === 'estimated'
-      ? ' (estymata — uzupełnij pole w DPD_B2B_Vehicles)'
-      : compliance.mileageSource === 'fabric'
-        ? ''
-        : ' (brak w encji)';
+    compliance.mileageSource === 'fabric'
+      ? ''
+      : ' (uzupełnione — brak pełnych danych w DPD_B2B_Vehicles)';
 
   return (
     <div className="compliance-panel">

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { FleetCostStats } from '../services/fleetStats';
 import type { CompanyCatalogData, CompanyCatalogItem } from '../services/companyCatalog';
 import { vehiclesForCompany } from '../services/companyCatalog';
@@ -5,6 +6,10 @@ import type { HealthScoreResult } from '../utils/healthScore';
 import { healthGradeClass } from '../utils/healthScore';
 import type { VehicleCatalogItem } from '../services/vehicleCatalog';
 import { FleetStatsPanel } from './FleetStatsPanel';
+import { SortableTh } from './SortableTh';
+import { sortArray, toggleSort, type SortState } from '../utils/tableSort';
+
+type CompanySortKey = 'name' | 'area' | 'health' | 'cost' | 'vehicles';
 
 interface Props {
   catalog: CompanyCatalogData | null;
@@ -35,13 +40,39 @@ export function CompaniesSection({
   onOpenVehicle,
   onExportCompanyPdf,
 }: Props) {
+  const [companySort, setCompanySort] = useState<SortState<CompanySortKey>>({ key: null, direction: 'asc' });
+
+  const sortedFiltered = useMemo(
+    () =>
+      sortArray(filtered, companySort, (c) => {
+        switch (companySort.key) {
+          case 'name':
+            return c.name;
+          case 'area':
+            return c.areaLabel || null;
+          case 'health':
+            return c.healthScore ?? null;
+          case 'cost':
+            return c.totalCost ?? null;
+          case 'vehicles':
+            return c.vehicleCount;
+          default:
+            return c.name;
+        }
+      }),
+    [filtered, companySort],
+  );
+
   const active =
     activeCompanyId && catalog
-      ? filtered.find((c) => c.id === activeCompanyId) ??
+      ? sortedFiltered.find((c) => c.id === activeCompanyId) ??
+        filtered.find((c) => c.id === activeCompanyId) ??
         catalog.companies.find((c) => c.id === activeCompanyId) ??
         null
       : null;
   const assigned = active ? vehiclesForCompany(fleetVehicles, active.name) : [];
+
+  const onSort = (key: CompanySortKey) => setCompanySort((s) => toggleSort(s, key));
 
   return (
     <div className="layout master-detail-layout">
@@ -56,14 +87,32 @@ export function CompaniesSection({
         {error && <p className="error-text">{error}</p>}
 
         <div className="table-wrap">
-          <table>
+          <table className="fleet-table">
             <thead>
               <tr>
-                <th>Firma</th>
-                <th>Region / miasto</th>
-                <th className="col-numeric">Health</th>
-                <th className="col-numeric">Koszty</th>
-                <th className="col-numeric">Pojazdy</th>
+                <SortableTh label="Firma" sortKey="name" sort={companySort} onSort={onSort} />
+                <SortableTh label="Region / miasto" sortKey="area" sort={companySort} onSort={onSort} />
+                <SortableTh
+                  label="Health"
+                  sortKey="health"
+                  sort={companySort}
+                  onSort={onSort}
+                  className="col-numeric"
+                />
+                <SortableTh
+                  label="Koszty"
+                  sortKey="cost"
+                  sort={companySort}
+                  onSort={onSort}
+                  className="col-numeric"
+                />
+                <SortableTh
+                  label="Pojazdy"
+                  sortKey="vehicles"
+                  sort={companySort}
+                  onSort={onSort}
+                  className="col-numeric"
+                />
               </tr>
             </thead>
             <tbody>
@@ -73,21 +122,21 @@ export function CompaniesSection({
                     Ładowanie słownika firm…
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : sortedFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="center">
                     {catalog ? 'Brak firm spełniających filtry.' : 'Brak danych firm.'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((c) => (
+                sortedFiltered.map((c) => (
                   <tr
                     key={c.id}
                     className={activeCompanyId === c.id ? 'row-active' : ''}
                     onClick={() => onSelectCompany(c.id)}
                   >
-                    <td>{c.name}</td>
-                    <td>{c.areaLabel || '—'}</td>
+                    <td className="col-text-wrap">{c.name}</td>
+                    <td className="col-text-wrap">{c.areaLabel || '—'}</td>
                     <td className="col-numeric">
                       {c.healthGrade ? (
                         <span className={healthGradeClass(c.healthGrade)}>{c.healthScore}</span>
@@ -145,7 +194,7 @@ export function CompaniesSection({
 
             <h3 className="section-title">Pojazdy B2B</h3>
             <div className="table-wrap table-wrap-nested">
-              <table>
+              <table className="fleet-table">
                 <thead>
                   <tr>
                     <th>Rejestracja</th>

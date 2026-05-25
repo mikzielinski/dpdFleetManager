@@ -5,9 +5,15 @@
  */
 import { execSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  authFilePath,
+  loadStagingDeployConfig,
+  parseAuthFile,
+  requireStagingAuth,
+  STAGING_LOGIN_ARGS,
+} from './uipath-staging-auth.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -19,29 +25,23 @@ if (!fs.existsSync(cfgPath)) {
   console.error(`Missing ${cfgPath}`);
   process.exit(1);
 }
-const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+const cfg =
+  envName === 'staging' ? loadStagingDeployConfig(root) : JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
 
-const authFile = path.join(os.homedir(), '.uipath', '.auth');
+if (envName === 'staging') {
+  requireStagingAuth(cfg);
+}
+
+const authFile = authFilePath();
 if (!fs.existsSync(authFile)) {
   console.error(`Brak sesji UiPath: ${authFile}`);
-  console.error(
-    'Zaloguj się: uip logout && uip login --organization mzpocevylrxu --tenant DefaultTenant --authority https://staging.uipath.com/identity_',
-  );
+  console.error(`Zaloguj się: npm run login:staging`);
+  console.error(`Lub: uip login ${STAGING_LOGIN_ARGS}`);
   process.exit(1);
 }
 
 function parseAuth(file) {
-  const map = Object.fromEntries(
-    fs
-      .readFileSync(file, 'utf8')
-      .split(/\r?\n/)
-      .filter((l) => l.includes('='))
-      .map((l) => {
-        const i = l.indexOf('=');
-        return [l.slice(0, i), l.slice(i + 1)];
-      }),
-  );
-  return { accessToken: map.UIPATH_ACCESS_TOKEN, refreshToken: map.UIPATH_REFRESH_TOKEN };
+  return parseAuthFile(file);
 }
 
 function jwtExp(token) {
