@@ -35,7 +35,7 @@ const ENTITY_LOOKUP = {
 
 /** Pola oczekiwane w panelu „Szczegóły zgłoszenia” */
 const DETAIL_FIELD_CANDIDATES = {
-  totalPrice: ['TotalPrice', 'GrossPrice', 'GrossAmount', 'Brutto', 'TotalAmount', 'Amount'],
+  totalPrice: ['TotalPrice', 'Total', 'GrossPrice', 'GrossAmount', 'Brutto', 'TotalAmount'],
   date: ['Date', 'ServiceDate', 'InvoiceDate', 'DocumentDate', 'TransactionDate', 'CostDate'],
   invoiceFileName: ['InvoiceFileName', 'invoiceFileName', 'Invoice File', 'InvoiceFile'],
   comments: ['Comments', 'ManagerComment', 'Comment', 'Note'],
@@ -349,6 +349,19 @@ async function main() {
     for (const f of full.fields ?? []) {
       console.log(`  ${f.name} (${f.fieldDisplayType ?? '?'})`);
     }
+  }
+
+  const amountLooksLikeGross = pocRows.filter((r) => {
+    const a = Number(r.Amount);
+    const n = Number(r.NetPrice);
+    return Number.isFinite(a) && Number.isFinite(n) && a > n;
+  }).length;
+  if (amountLooksLikeGross > 0) {
+    console.log(
+      `\n⚠ Jakość danych: ${amountLooksLikeGross}/${pocRows.length} rekordów ma Amount > NetPrice — ` +
+        'prawdopodobnie brutto trafiło do Amount zamiast do GrossPrice. ' +
+        'Dodaj pole GrossPrice w DPD_POC i uruchom: node scripts/migrate-poc-prices.mjs',
+    );
   }
 
   console.log('\n--- Werdykt ---');

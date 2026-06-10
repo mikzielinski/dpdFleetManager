@@ -1,9 +1,10 @@
 import type { AnalysisVariables } from '../services/maestro';
 import type { VehicleFlagHistoryItem } from '../services/dataFabric';
 import {
+  extractFileDisplayName,
   findInvoiceFileField,
+  formatDateValue,
   formatValue,
-  isFileMeta,
   normalizeDpdRecord,
   pickField,
   pickVehicleFlagField,
@@ -27,7 +28,7 @@ const ANALYSIS_DETAIL_MAP: Partial<Record<string, keyof AnalysisVariables>> = {
 
 const FLAG_DETAIL_MAP: Record<string, string> = {
   combinedScore: 'aiConfidenceScore',
-  flagType: 'description',
+  flagType: 'flagType',
   fleetManagerNote: 'description',
   comments: 'requiresAction',
 };
@@ -39,18 +40,35 @@ export function deriveInvoiceFileName(
 ): string | undefined {
   const normalized = normalizeDpdRecord(record);
   const existing = resolveRecordField(normalized, 'invoiceFileName', 'invoiceFileName');
-  if (existing !== undefined) return formatValue(existing);
+  if (existing !== undefined) {
+    const fromObj = extractFileDisplayName(existing);
+    if (fromObj) return fromObj;
+    if (typeof existing === 'string' && !existing.trim().startsWith('{')) {
+      return formatValue(existing);
+    }
+  }
 
   const fieldName = findInvoiceFileField(normalized, fileFields);
   if (!fieldName) return undefined;
 
   const meta = normalized[fieldName];
-  if (typeof meta === 'string' && meta.trim()) return meta.trim();
-  if (isFileMeta(meta)) {
-    const name = meta.name ?? (meta as { Name?: string }).Name;
-    if (name) return name;
+  return extractFileDisplayName(meta);
+}
+
+function deriveServiceDate(record: DpdRecord, fileFields: string[]): unknown {
+  const existing = resolveRecordField(record, 'date', 'date');
+  if (existing !== undefined) return existing;
+
+  const invField = findInvoiceFileField(record, fileFields);
+  if (invField) {
+    const meta = record[invField];
+    if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+      const ct = (meta as Record<string, unknown>).CreateTime;
+      if (ct) return ct;
+    }
   }
-  return undefined;
+
+  return record.CreateTime ?? record.createTime;
 }
 
 /** Scala DPD_POC + wynik Maestro + powiązany wpis DPD_VehicleFlags dla panelu szczegółów. */
@@ -64,6 +82,11 @@ export function enrichRecordForDetailView(
   const invoiceName = deriveInvoiceFileName(out, fileFields);
   if (invoiceName) out.invoiceFileName = invoiceName;
 
+  const serviceDate = deriveServiceDate(out, fileFields);
+  if (serviceDate !== undefined && resolveRecordField(out, 'date', 'date') === undefined) {
+    out.date = serviceDate;
+  }
+
   if (analysis) {
     for (const [detailKey, analysisKey] of Object.entries(ANALYSIS_DETAIL_MAP)) {
       if (!analysisKey) continue;
@@ -73,9 +96,6 @@ export function enrichRecordForDetailView(
       if (fromAnalysis != null && String(fromAnalysis).trim()) {
         out[detailKey] = fromAnalysis;
       }
-    }
-    if (!resolveRecordField(out, 'totalPrice', 'totalPrice') && analysis.declaredAmount) {
-      out.totalPrice = analysis.declaredAmount;
     }
   }
 
@@ -105,5 +125,6 @@ export function pickDetailField(
   context: DetailEnrichmentContext = {},
 ): string {
   const enriched = enrichRecordForDetailView(record, context);
+  if (key === 'date') return formatDateValue(resolveRecordField(enriched, 'date', 'date'));
   return pickField(enriched, key);
 }

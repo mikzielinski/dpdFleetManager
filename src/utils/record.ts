@@ -11,6 +11,7 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   taxId: ['TaxID', 'taxId', 'TaxId'],
   amount: ['Amount', 'amount'],
   netPrice: ['NetPrice', 'netPrice'],
+  grossPrice: ['GrossPrice', 'grossPrice', 'Brutto', 'brutto'],
   decision: ['Status', 'status', 'decision', 'Decision'],
   serviceType: ['ServiceType', 'serviceType'],
   riskLevel: ['RiskLevel', 'riskLevel'],
@@ -18,15 +19,7 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   flagType: ['FlagType', 'flagType'],
   fleetManagerNote: ['FleetManagerNote', 'fleetManagerNote'],
   fraudFlag: ['FraudFlag', 'fraudFlag'],
-  invoiceFileName: [
-    'invoiceFileName',
-    'InvoiceFileName',
-    'Invoice File',
-    'InvoiceFile',
-    'Invoice',
-    'InvoiceRecipt',
-    'InvoiceReceipt',
-  ],
+  invoiceFileName: ['invoiceFileName', 'InvoiceFileName', 'Invoice File', 'InvoiceFile'],
   date: [
     'Date',
     'date',
@@ -37,15 +30,18 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
     'DocumentDate',
     'TransactionDate',
     'CostDate',
+    'CreateTime',
+    'createTime',
   ],
   totalPrice: [
     'TotalPrice',
     'totalPrice',
-    'GrossPrice',
-    'grossPrice',
+    'Total',
+    'total',
     'GrossAmount',
     'TotalAmount',
-    'Brutto',
+    'GrossPrice',
+    'grossPrice',
   ],
   anomalyReason: ['AnomalyReason', 'anomalyReason', 'FraudFlag', 'fraudFlag'],
   comments: ['Comments', 'comments', 'ManagerComment', 'managerComment'],
@@ -53,17 +49,24 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
 
 const VEHICLE_FLAG_FIELD_ALIASES: Record<string, readonly string[]> = {
   vehicleId: ['VehicleID', 'Vehicle ID', 'VehicleId', 'vehicleId', 'vehicleID'],
-  flaggedAt: ['Flagged at Date', 'FlaggedAtDate', 'FlaggedAt', 'flaggedAt'],
+  flaggedAt: [
+    'FllagedatDate',
+    'Flagged at Date',
+    'FlaggedAtDate',
+    'FlaggedAt',
+    'flaggedAt',
+  ],
   description: ['Description', 'description'],
   requiresAction: ['Requires Action', 'RequiresAction', 'requiresAction'],
   aiConfidenceScore: ['AI Confidence Score', 'AIConfidenceScore', 'aiConfidenceScore'],
   relatedCostRecordId: [
     'Related Cost Record ID',
+    'RelatedCostRecordID',
     'RelatedCostRecordId',
     'relatedCostRecordId',
   ],
   companyId: ['Company ID', 'CompanyId', 'companyId'],
-  riskLevel: ['Risk Level', 'RiskLevel', 'riskLevel'],
+  riskLevel: ['Severity', 'Risk Level', 'RiskLevel', 'riskLevel'],
   flagType: ['Flag Type', 'FlagType', 'flagType', 'Anomaly Type', 'AnomalyType'],
   fleetManagerNote: [
     'Fleet Manager Note',
@@ -145,6 +148,19 @@ export function normalizeDpdRecord(record: DpdRecord): DpdRecord {
     out.Invoice ?? out.InvoiceRecipt ?? out.invoice ?? out.invoiceRecipt;
   if (invoice !== undefined && out.Invoice === undefined) {
     out.Invoice = invoice;
+  }
+
+  const invoiceName = extractFileDisplayName(out.invoiceFileName);
+  if (invoiceName) out.invoiceFileName = invoiceName;
+  else if (typeof out.invoiceFileName === 'object') delete out.invoiceFileName;
+
+  if (!out.invoiceFileName) {
+    const fromFile = extractFileDisplayName(invoice);
+    if (fromFile) out.invoiceFileName = fromFile;
+  }
+
+  if (!out.date && out.CreateTime) {
+    out.date = out.CreateTime;
   }
 
   return out;
@@ -244,14 +260,23 @@ export function resolveChoiceSetLabel(
 export function formatValue(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'boolean') return v ? 'Tak' : 'Nie';
+  if (Array.isArray(v)) {
+    if (v.length === 1) return formatValue(v[0]);
+    return v.map((item) => formatValue(item)).join(', ');
+  }
   if (typeof v === 'object') {
+    const fileName = extractFileDisplayName(v);
+    if (fileName) return fileName;
     const o = v as Record<string, unknown>;
     if (typeof o.displayName === 'string' && o.displayName) return o.displayName;
+    if (typeof o.DisplayName === 'string' && o.DisplayName) return o.DisplayName;
     if (typeof o.name === 'string' && o.name) return o.name;
+    if (typeof o.Name === 'string' && o.Name) return o.Name;
     if (o.value !== undefined && o.value !== null && typeof o.value !== 'object') {
       return formatValue(o.value);
     }
     if (typeof o.numberId === 'number') return String(o.numberId);
+    if (typeof o.NumberId === 'number') return String(o.NumberId);
     return JSON.stringify(v);
   }
   return String(v);
@@ -264,7 +289,9 @@ export function isFileMeta(v: unknown): v is { id?: string; name?: string; conte
   if (typeof v !== 'object' || v === null) return false;
   const o = v as Record<string, unknown>;
   if (typeof o.id === 'string' && o.id) return true;
+  if (typeof o.Id === 'string' && o.Id) return true;
   if (typeof o.name === 'string' && o.name) return true;
+  if (typeof o.Name === 'string' && o.Name) return true;
   if (typeof o.fileId === 'string' && o.fileId) return true;
   if (typeof o.attachmentId === 'string' && o.attachmentId) return true;
   const nested = o.value ?? o.Value;
@@ -274,12 +301,50 @@ export function isFileMeta(v: unknown): v is { id?: string; name?: string; conte
 
 /** Compare plates / vehicle IDs ignoring spaces and case. */
 export function normalizeRegistration(value: string): string {
-  return value.replace(/\s+/g, '').toUpperCase();
+  return value
+    .replace(/^VH[-_\s]*/i, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
 }
 
 export function registrationsMatch(a: string | undefined, b: string | undefined): boolean {
   if (!a?.trim() || !b?.trim()) return false;
-  return normalizeRegistration(a) === normalizeRegistration(b);
+  const na = normalizeRegistration(a);
+  const nb = normalizeRegistration(b);
+  if (na === nb) return true;
+  return na.endsWith(nb) || nb.endsWith(na);
+}
+
+/** File attachment metadata from Data Fabric (PascalCase or camelCase). */
+export function extractFileDisplayName(v: unknown): string | undefined {
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) return undefined;
+    if (s.startsWith('{')) {
+      try {
+        return extractFileDisplayName(JSON.parse(s));
+      } catch {
+        return s;
+      }
+    }
+    return s;
+  }
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  const name = o.Name ?? o.name;
+  if (typeof name === 'string' && name.trim()) return name.trim();
+  const nested = o.value ?? o.Value;
+  if (nested !== undefined && nested !== v) return extractFileDisplayName(nested);
+  return undefined;
+}
+
+export function formatDateValue(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—';
+  const raw = typeof v === 'string' || typeof v === 'number' ? String(v) : '';
+  if (!raw) return formatValue(v);
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return raw;
+  return new Date(parsed).toLocaleDateString('pl-PL');
 }
 
 export function pickVehicleFlagField(r: DpdRecord, canonical: string): string {

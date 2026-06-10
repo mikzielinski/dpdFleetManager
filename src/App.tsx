@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PaginationCursor } from '@uipath/uipath-typescript/core';
 import { AuthLoginScreen, BYPASS_AUTH, useAuth } from './hooks/useAuth';
 import { usePolling } from './hooks/usePolling';
-import { ORCHESTRATOR_RELEASE_NAME, PAGE_SIZE, TABLE_COLUMNS, type TableColumn } from './config';
+import {
+  DETAIL_FIELD_LABELS,
+  ORCHESTRATOR_RELEASE_NAME,
+  PAGE_SIZE,
+  TABLE_COLUMNS,
+  type TableColumn,
+} from './config';
 import {
   displayField,
   downloadInvoiceBlob,
@@ -1010,6 +1016,7 @@ export default function App() {
                           'taxId',
                           'amount',
                           'netPrice',
+                          'grossPrice',
                           'totalPrice',
                           'date',
                           'invoiceFileName',
@@ -1022,7 +1029,7 @@ export default function App() {
                           'fleetManagerNote',
                         ].map((key) => (
                           <div key={key} className="detail-item">
-                            <dt>{key}</dt>
+                            <dt>{DETAIL_FIELD_LABELS[key] ?? key}</dt>
                             <dd>
                               {detailRecord
                                 ? pickDetailField(detailRecord, key, detailContext)

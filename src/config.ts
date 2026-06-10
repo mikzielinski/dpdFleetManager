@@ -44,11 +44,49 @@ export interface TableColumn {
 export const TABLE_COLUMNS: TableColumn[] = [
   { key: 'carRegistration', fieldName: 'CarRegistration', label: 'Pojazd' },
   { key: 'serviceName', fieldName: 'ServiceName', label: 'Usługa' },
-  { key: 'companyName', fieldName: 'CompanyName', label: 'Nazwa firmy' },
+  { key: 'companyName', fieldName: 'CompanyName', label: 'Firma' },
   { key: 'taxId', fieldName: 'TaxID', label: 'NIP' },
-  { key: 'netPrice', fieldName: 'NetPrice', label: 'Kwota' },
+  { key: 'netPrice', fieldName: 'NetPrice', label: 'Netto' },
+  { key: 'grossPrice', fieldName: 'GrossPrice', label: 'Brutto' },
+  { key: 'amount', fieldName: 'Amount', label: 'Ilość' },
   { key: 'decision', fieldName: 'Status', label: 'Decyzja' },
 ];
+
+/** Polish labels for known Data Fabric field names (override schema displayName). */
+export const TABLE_FIELD_LABEL_OVERRIDES: Record<string, string> = {
+  Amount: 'Ilość',
+  NetPrice: 'Netto',
+  GrossPrice: 'Brutto',
+  TotalPrice: 'Razem',
+  Total: 'Razem',
+  Status: 'Decyzja',
+  CarRegistration: 'Pojazd',
+  ServiceName: 'Usługa',
+  CompanyName: 'Firma',
+  TaxID: 'NIP',
+};
+
+/** Panel „Szczegóły zgłoszenia” — etykiety pól */
+export const DETAIL_FIELD_LABELS: Record<string, string> = {
+  carRegistration: 'Rejestracja',
+  serviceName: 'Usługa',
+  serviceDescription: 'Opis usługi',
+  companyName: 'Firma',
+  taxId: 'NIP',
+  amount: 'Ilość',
+  netPrice: 'Netto',
+  grossPrice: 'Brutto',
+  totalPrice: 'Razem',
+  date: 'Data',
+  invoiceFileName: 'Plik faktury',
+  decision: 'Decyzja',
+  anomalyReason: 'Anomalia',
+  comments: 'Komentarz',
+  riskLevel: 'Ryzyko',
+  combinedScore: 'Wynik',
+  flagType: 'Typ flagi',
+  fleetManagerNote: 'Notatka managera',
+};
 
 /** Preferred Data Fabric fields for the grid (PascalCase names from entity schema) */
 export const TABLE_FIELD_PREFERENCES = [
@@ -57,6 +95,9 @@ export const TABLE_FIELD_PREFERENCES = [
   'CompanyName',
   'TaxID',
   'NetPrice',
+  'GrossPrice',
+  'TotalPrice',
+  'Total',
   'Amount',
   'Status',
 ];

@@ -28,11 +28,9 @@ function parseNumLoose(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Parsed numeric amount (net preferred, then amount) for filtering and summaries. */
+/** Parsed numeric net amount for filtering and summaries (never Amount/ilość). */
 export function getRecordNumericAmount(r: DpdRecord): number | null {
-  const net = parseNumLoose(pickField(r, 'netPrice'));
-  if (net !== null) return net;
-  return parseNumLoose(pickField(r, 'amount'));
+  return parseNumLoose(pickField(r, 'netPrice'));
 }
 
 /** True when record is flagged / anomaly (Status, flag fields, or anomaly reason). */

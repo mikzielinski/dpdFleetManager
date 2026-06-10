@@ -6,6 +6,7 @@ import {
   DPD_VEHICLE_FLAGS_ENTITY_ID,
   INVOICE_FILE_FIELD_CANDIDATES,
   TABLE_COLUMNS,
+  TABLE_FIELD_LABEL_OVERRIDES,
   TABLE_FIELD_PREFERENCES,
   type TableColumn,
 } from '../config';
@@ -59,7 +60,7 @@ export function buildTableColumnsFromEntity(entity: EntityGetResponse): TableCol
     columns.push({
       key: fieldToColumnKey(field.name),
       fieldName: field.name,
-      label: field.displayName || field.name,
+      label: TABLE_FIELD_LABEL_OVERRIDES[field.name] ?? field.displayName ?? field.name,
     });
     byName.delete(pref);
   }
@@ -72,7 +73,7 @@ export function buildTableColumnsFromEntity(entity: EntityGetResponse): TableCol
       columns.push({
         key: fieldToColumnKey(field.name),
         fieldName: field.name,
-        label: field.displayName || field.name,
+        label: TABLE_FIELD_LABEL_OVERRIDES[field.name] ?? field.displayName ?? field.name,
       });
       if (columns.length >= 6) break;
     }
