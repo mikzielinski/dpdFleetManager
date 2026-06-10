@@ -22,6 +22,7 @@ import {
   isRedirectUriEnvOverride,
   isStudioDesignerPreview,
   readPersistedOAuthUrlError,
+  resolveOAuthScope,
   resolveRedirectUri,
   getAccountAccessErrorHint,
 } from '../utils/oauthRedirect';
@@ -66,8 +67,7 @@ function readAuthConfig(): AuthConfigResult {
   const clientId =
     getMetaTagContent('uipath:client-id') ||
     (import.meta.env.VITE_UIPATH_CLIENT_ID ?? '').trim();
-  const scope =
-    getMetaTagContent('uipath:scope') || (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim();
+  const scope = resolveOAuthScope();
   const orgName =
     getMetaTagContent('uipath:org-name') || (import.meta.env.VITE_UIPATH_ORG_NAME ?? '').trim();
   const tenantName =
