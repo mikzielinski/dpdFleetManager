@@ -97,6 +97,7 @@ export default function App() {
   const {
     sdk,
     isAuthenticated,
+    sdkReady,
     isInitializing,
     authError,
     oauthUrlError,
@@ -346,7 +347,7 @@ export default function App() {
 
   const loadPage = useCallback(
     async (nextCursor?: PaginationCursor, resetStack = false) => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || !sdkReady) return;
       setLoadingTable(true);
       setTableError(null);
       try {
@@ -366,11 +367,11 @@ export default function App() {
         setLoadingTable(false);
       }
     },
-    [sdk, isAuthenticated],
+    [sdk, isAuthenticated, sdkReady],
   );
 
   const loadAllForFilters = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !sdkReady) return;
     setLoadingTable(true);
     setTableError(null);
     try {
@@ -387,24 +388,24 @@ export default function App() {
     } finally {
       setLoadingTable(false);
     }
-  }, [sdk, isAuthenticated]);
+  }, [sdk, isAuthenticated, sdkReady]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !sdkReady) return;
     if (globalFilterActive) {
       void loadAllForFilters();
     } else if (prevGlobalFilterRef.current) {
       void loadPage(undefined, true);
     }
     prevGlobalFilterRef.current = globalFilterActive;
-  }, [globalFilterActive, isAuthenticated, loadAllForFilters, loadPage]);
+  }, [globalFilterActive, isAuthenticated, sdkReady, loadAllForFilters, loadPage]);
 
   useEffect(() => {
     if (globalFilterActive) setPageIndex(0);
   }, [claimFilters, globalFilterActive]);
 
   const loadVehicleTabData = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !sdkReady) return;
     setVehicleCatalogLoading(true);
     setVehicleCatalogError(null);
     try {
@@ -421,10 +422,10 @@ export default function App() {
     } finally {
       setVehicleCatalogLoading(false);
     }
-  }, [sdk, isAuthenticated]);
+  }, [sdk, isAuthenticated, sdkReady]);
 
   useEffect(() => {
-    if (mainSection !== 'vehicles' || !isAuthenticated) return;
+    if (mainSection !== 'vehicles' || !isAuthenticated || !sdkReady) return;
     if (vehicleCatalog || vehicleCatalogLoading) return;
     void loadVehicleTabData();
   }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
@@ -438,7 +439,7 @@ export default function App() {
   }, [companyFilters, mainSection]);
 
   const loadCompanyTabData = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !sdkReady) return;
     setCompanyCatalogLoading(true);
     setCompanyCatalogError(null);
     try {
@@ -460,16 +461,21 @@ export default function App() {
     } finally {
       setCompanyCatalogLoading(false);
     }
-  }, [sdk, isAuthenticated, vehicleCatalog]);
+  }, [sdk, isAuthenticated, sdkReady, vehicleCatalog]);
 
   useEffect(() => {
-    if (mainSection !== 'companies' || !isAuthenticated) return;
+    if (mainSection !== 'companies' || !isAuthenticated || !sdkReady) return;
     if (companyCatalog || companyCatalogLoading) return;
     void loadCompanyTabData();
   }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !sdkReady) return;
+    void loadPage(undefined, true);
+  }, [isAuthenticated, sdkReady, loadPage]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !sdkReady) return;
     let cancelled = false;
     (async () => {
       try {
@@ -477,26 +483,45 @@ export default function App() {
         if (cancelled) return;
         ctxRef.current = entityCtx;
         setCtx(entityCtx);
-        try {
-          const target = await resolveMaestroTarget(sdk);
-          if (cancelled) return;
-          setMaestroTarget(target);
-          setMaestroError(null);
-        } catch (e) {
-          if (!cancelled) {
-            setMaestroTarget(null);
-            setMaestroError(e instanceof Error ? e.message : String(e));
-          }
-        }
-        await loadPage(undefined, true);
       } catch (e) {
-        if (!cancelled) setTableError(e instanceof Error ? e.message : String(e));
+        if (!cancelled && import.meta.env.DEV) {
+          console.warn('[DataFabric] loadEntityContext:', e);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, sdk, loadPage]);
+  }, [isAuthenticated, sdkReady, sdk]);
+
+  useEffect(() => {
+    if (!ctx?.choiceMaps.size) return;
+    setRecords((prev) => {
+      if (prev.length === 0) return prev;
+      return prev.map((r) => translateRecord(r, ctx.choiceMaps));
+    });
+  }, [ctx]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !sdkReady) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const target = await resolveMaestroTarget(sdk);
+        if (cancelled) return;
+        setMaestroTarget(target);
+        setMaestroError(null);
+      } catch (e) {
+        if (!cancelled) {
+          setMaestroTarget(null);
+          setMaestroError(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, sdkReady, sdk]);
 
   const selectRecord = useCallback(
     async (id: string) => {
@@ -974,11 +999,22 @@ export default function App() {
                     ) : filteredRecords.length === 0 ? (
                       <tr>
                         <td colSpan={tableColumns.length + 1} className="center">
-                          {records.length === 0
-                            ? 'Brak zgłoszeń.'
-                            : globalFilterActive
-                              ? `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
-                              : `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`}
+                          {records.length === 0 ? (
+                            <>
+                              Brak zgłoszeń.
+                              {!tableError && !loadingTable && sdkReady ? (
+                                <>
+                                  {' '}
+                                  Spróbuj odświeżyć stronę lub zaloguj się ponownie (sesja OAuth mogła
+                                  wygasnąć).
+                                </>
+                              ) : null}
+                            </>
+                          ) : globalFilterActive ? (
+                            `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
+                          ) : (
+                            `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`
+                          )}
                         </td>
                       </tr>
                     ) : (
