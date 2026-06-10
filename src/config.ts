@@ -88,6 +88,32 @@ export const DETAIL_FIELD_LABELS: Record<string, string> = {
   fleetManagerNote: 'Notatka managera',
 };
 
+/** Ukryj w szczegółach, gdy wartość to „—”. */
+export const DETAIL_OPTIONAL_FIELDS = [
+  'decision',
+  'anomalyReason',
+  'comments',
+  'riskLevel',
+  'combinedScore',
+  'flagType',
+  'fleetManagerNote',
+] as const;
+
+export const DETAIL_FIELD_KEYS = [
+  'carRegistration',
+  'serviceName',
+  'serviceDescription',
+  'companyName',
+  'taxId',
+  'amount',
+  'netPrice',
+  'grossPrice',
+  'totalPrice',
+  'date',
+  'invoiceFileName',
+  ...DETAIL_OPTIONAL_FIELDS,
+] as const;
+
 /** Preferred Data Fabric fields for the grid (PascalCase names from entity schema) */
 export const TABLE_FIELD_PREFERENCES = [
   'CarRegistration',

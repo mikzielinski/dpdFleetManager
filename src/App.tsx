@@ -3,7 +3,9 @@ import type { PaginationCursor } from '@uipath/uipath-typescript/core';
 import { AuthLoginScreen, BYPASS_AUTH, useAuth } from './hooks/useAuth';
 import { usePolling } from './hooks/usePolling';
 import {
+  DETAIL_FIELD_KEYS,
   DETAIL_FIELD_LABELS,
+  DETAIL_OPTIONAL_FIELDS,
   ORCHESTRATOR_RELEASE_NAME,
   PAGE_SIZE,
   TABLE_COLUMNS,
@@ -701,6 +703,51 @@ export default function App() {
     }
   }, [detailRecord]);
 
+  const invoiceDownloadUrl = useMemo(() => {
+    if (!invoiceBlob) return null;
+    return URL.createObjectURL(invoiceBlob);
+  }, [invoiceBlob]);
+
+  useEffect(() => {
+    return () => {
+      if (invoiceDownloadUrl) URL.revokeObjectURL(invoiceDownloadUrl);
+    };
+  }, [invoiceDownloadUrl]);
+
+  const invoiceDownloadName = useMemo(() => {
+    if (!detailRecord) return 'faktura.pdf';
+    const name = pickDetailField(detailRecord, 'invoiceFileName', detailContext);
+    return name !== '—' ? name : 'faktura.pdf';
+  }, [detailRecord, detailContext]);
+
+  const visibleDetailFields = useMemo(() => {
+    const optional = new Set<string>(DETAIL_OPTIONAL_FIELDS);
+    const fileFields = ctx?.fileFields ?? [];
+    const hasInvoiceAttachment =
+      (activeRecord && !!findInvoiceFileField(activeRecord, fileFields)) ||
+      !!invoiceBlob ||
+      invoiceLoading;
+
+    return DETAIL_FIELD_KEYS.filter((key) => {
+      if (key === 'invoiceFileName') {
+        return hasInvoiceAttachment && (!!invoiceBlob || invoiceLoading);
+      }
+      if (!optional.has(key)) return true;
+      if (!detailRecord && !activeRecord) return false;
+      const val = detailRecord
+        ? pickDetailField(detailRecord, key, detailContext)
+        : pickField(activeRecord!, key);
+      return val !== '—';
+    });
+  }, [
+    activeRecord,
+    detailRecord,
+    detailContext,
+    invoiceBlob,
+    invoiceLoading,
+    ctx?.fileFields,
+  ]);
+
   const onRowClick = (r: DpdRecord) => {
     const id = recordId(r);
     if (id) void selectRecord(id);
@@ -1008,32 +1055,29 @@ export default function App() {
                     <div className="detail-split-main">
                       <h3 className="section-title">Szczegóły zgłoszenia</h3>
                       <dl className="detail-grid">
-                        {[
-                          'carRegistration',
-                          'serviceName',
-                          'serviceDescription',
-                          'companyName',
-                          'taxId',
-                          'amount',
-                          'netPrice',
-                          'grossPrice',
-                          'totalPrice',
-                          'date',
-                          'invoiceFileName',
-                          'decision',
-                          'anomalyReason',
-                          'comments',
-                          'riskLevel',
-                          'combinedScore',
-                          'flagType',
-                          'fleetManagerNote',
-                        ].map((key) => (
+                        {visibleDetailFields.map((key) => (
                           <div key={key} className="detail-item">
                             <dt>{DETAIL_FIELD_LABELS[key] ?? key}</dt>
                             <dd>
-                              {detailRecord
-                                ? pickDetailField(detailRecord, key, detailContext)
-                                : pickField(activeRecord, key)}
+                              {key === 'invoiceFileName' ? (
+                                invoiceLoading ? (
+                                  <span className="hint-small">Pobieranie załącznika…</span>
+                                ) : invoiceDownloadUrl ? (
+                                  <a
+                                    className="invoice-download-link"
+                                    href={invoiceDownloadUrl}
+                                    download={invoiceDownloadName}
+                                  >
+                                    Pobierz {invoiceDownloadName}
+                                  </a>
+                                ) : (
+                                  '—'
+                                )
+                              ) : detailRecord ? (
+                                pickDetailField(detailRecord, key, detailContext)
+                              ) : (
+                                pickField(activeRecord, key)
+                              )}
                             </dd>
                           </div>
                         ))}

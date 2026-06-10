@@ -470,6 +470,16 @@ tbody tr:hover {
   word-break: break-word;
 }
 
+.invoice-download-link {
+  color: #dc0032;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.invoice-download-link:hover {
+  text-decoration: underline;
+}
+
 .placeholder {
   color: #666;
   padding: 40px 0;
