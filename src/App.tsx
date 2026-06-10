@@ -28,7 +28,9 @@ import {
 } from './services/dataFabric';
 import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
+import { DashboardSection } from './components/DashboardSection';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
+import { InsightsSection } from './components/InsightsSection';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import {
   DEFAULT_CLAIMS_FILTERS,
@@ -141,7 +143,9 @@ export default function App() {
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
   const [activeVehicleFlag, setActiveVehicleFlag] = useState<VehicleFlagHistoryItem | null>(null);
 
-  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies'>('claims');
+  const [mainSection, setMainSection] = useState<
+    'dashboard' | 'claims' | 'vehicles' | 'companies' | 'insights'
+  >('claims');
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
   const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>(DEFAULT_VEHICLE_FILTERS);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogData | null>(null);
@@ -333,6 +337,19 @@ export default function App() {
     [allPocCosts, tableColumns],
   );
 
+  const fleetHealth = useMemo(
+    () =>
+      computeHealthScore({
+        stats: fleetStats,
+        complianceIssueCount: enrichedVehicles.reduce(
+          (n, v) => n + (v.compliance?.complianceIssues.length ?? 0),
+          0,
+        ),
+        fleetMedianCostPerClaim: fleetMedianCost,
+      }),
+    [fleetStats, enrichedVehicles, fleetMedianCost],
+  );
+
   const activeVehicleCosts = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return [];
     return matchCostsToVehicle(
@@ -425,11 +442,24 @@ export default function App() {
     }
   }, [sdk, isAuthenticated, sdkReady]);
 
+  const needsFleetCatalog =
+    mainSection === 'vehicles' ||
+    mainSection === 'dashboard' ||
+    mainSection === 'insights' ||
+    mainSection === 'companies';
+
   useEffect(() => {
-    if (mainSection !== 'vehicles' || !isAuthenticated || !sdkReady) return;
+    if (!needsFleetCatalog || !isAuthenticated || !sdkReady) return;
     if (vehicleCatalog || vehicleCatalogLoading) return;
     void loadVehicleTabData();
-  }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
+  }, [
+    needsFleetCatalog,
+    isAuthenticated,
+    sdkReady,
+    vehicleCatalog,
+    vehicleCatalogLoading,
+    loadVehicleTabData,
+  ]);
 
   useEffect(() => {
     if (mainSection === 'vehicles') setActiveVehicleId(null);
@@ -465,10 +495,17 @@ export default function App() {
   }, [sdk, isAuthenticated, sdkReady, vehicleCatalog]);
 
   useEffect(() => {
-    if (mainSection !== 'companies' || !isAuthenticated || !sdkReady) return;
+    if (
+      mainSection !== 'companies' &&
+      mainSection !== 'dashboard' &&
+      mainSection !== 'insights'
+    ) {
+      return;
+    }
+    if (!isAuthenticated || !sdkReady) return;
     if (companyCatalog || companyCatalogLoading) return;
     void loadCompanyTabData();
-  }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
+  }, [mainSection, isAuthenticated, sdkReady, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
 
   useEffect(() => {
     if (!isAuthenticated || !sdkReady) return;
@@ -621,6 +658,17 @@ export default function App() {
   const openVehicleInClaims = (plateQuery: string) => {
     setClaimFilters({ ...DEFAULT_CLAIMS_FILTERS, query: plateQuery });
     setMainSection('claims');
+  };
+
+  const openVehicleById = (vehicleId: string) => {
+    setMainSection('vehicles');
+    setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
+    setActiveVehicleId(vehicleId);
+  };
+
+  const openClaimById = (id: string) => {
+    setMainSection('claims');
+    void selectRecord(id);
   };
 
   const runAnalysis = async (ids: string[]) => {
@@ -891,6 +939,13 @@ export default function App() {
       <nav className="main-nav" aria-label="Nawigacja główna">
         <button
           type="button"
+          className={mainSection === 'dashboard' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
           className={mainSection === 'claims' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
           onClick={() => setMainSection('claims')}
         >
@@ -915,6 +970,13 @@ export default function App() {
           }}
         >
           Firma
+        </button>
+        <button
+          type="button"
+          className={mainSection === 'insights' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('insights')}
+        >
+          Analizy
         </button>
         <button
           type="button"
@@ -950,14 +1012,18 @@ export default function App() {
             ? filteredRecords.length
             : mainSection === 'vehicles'
               ? filteredVehicles.length
-              : filteredCompanies.length
+              : mainSection === 'companies'
+                ? filteredCompanies.length
+                : allPocCosts.length
         }
         totalCount={
           mainSection === 'claims'
             ? records.length
             : mainSection === 'vehicles'
               ? (vehicleCatalog?.totalVehicles ?? 0)
-              : (companyCatalog?.totalCompanies ?? 0)
+              : mainSection === 'companies'
+                ? (companyCatalog?.totalCompanies ?? 0)
+                : allPocCosts.length
         }
         globalFilterActive={mainSection === 'claims' && globalFilterActive}
         datasetTotal={recordTotal}
@@ -1425,6 +1491,46 @@ export default function App() {
               )}
             </section>
           </div>
+        ) : mainSection === 'dashboard' ? (
+          <DashboardSection
+            stats={fleetStats}
+            health={fleetHealth}
+            vehicleCount={vehicleCatalog?.totalVehicles ?? 0}
+            companyCount={companyCatalog?.totalCompanies ?? 0}
+            loading={vehicleCatalogLoading}
+            error={vehicleCatalogError}
+            onRefresh={() => {
+              setVehicleCatalog(null);
+              setCompanyCatalog(null);
+              void loadVehicleTabData();
+              void loadCompanyTabData();
+            }}
+            onExportPdf={() =>
+              downloadFleetSummaryPdf({
+                stats: fleetStats,
+                vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
+                companyCount: companyCatalog?.totalCompanies ?? 0,
+              })
+            }
+          />
+        ) : mainSection === 'insights' ? (
+          <InsightsSection
+            costs={allPocCosts}
+            vehicles={enrichedVehicles}
+            companies={enrichedCompanies}
+            fleetStats={fleetStats}
+            tableColumns={tableColumns}
+            loading={vehicleCatalogLoading || companyCatalogLoading}
+            error={vehicleCatalogError ?? companyCatalogError}
+            onRefresh={() => {
+              setVehicleCatalog(null);
+              setCompanyCatalog(null);
+              void loadVehicleTabData();
+              void loadCompanyTabData();
+            }}
+            onOpenClaim={openClaimById}
+            onOpenVehicle={openVehicleById}
+          />
         ) : (
           <CompaniesSection
             catalog={companyCatalog}
