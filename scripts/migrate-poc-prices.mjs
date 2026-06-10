@@ -126,10 +126,15 @@ async function main() {
   for (const row of candidates) {
     const id = row.Id ?? row.id;
     try {
-      await api(token, 'PATCH', `/datafabric_/api/EntityService/entity/${POC_ENTITY_ID}/${id}`, {
-        GrossPrice: Number(row.Amount),
-        Amount: null,
-      });
+      await api(
+        token,
+        'POST',
+        `/datafabric_/api/EntityService/entity/${POC_ENTITY_ID}/update/${id}`,
+        {
+          GrossPrice: Number(row.Amount),
+          Amount: null,
+        },
+      );
       ok += 1;
     } catch (e) {
       fail += 1;
