@@ -266,11 +266,20 @@ async function main() {
 
   console.log('==> Verify hosted bundle');
   const verifyUrl = cfg.hostedBaseUrl.endsWith('/') ? cfg.hostedBaseUrl : `${cfg.hostedBaseUrl}/`;
-  const html = await (await fetch(verifyUrl)).text();
   const indexHtml = fs.readFileSync(path.join(root, 'dist', 'index.html'), 'utf8');
   const expected = indexHtml.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1];
-  const live = html.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1];
-  const cdn = html.match(/uipath:cdn-base" content="[^"]+\/(\d+)"/)?.[1];
+  let live;
+  let cdn;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const html = await (await fetch(verifyUrl, { cache: 'no-store' })).text();
+    live = html.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1];
+    cdn = html.match(/uipath:cdn-base" content="[^"]+\/(\d+)"/)?.[1];
+    if (live === expected && cdn === String(deployVersion)) break;
+    if (attempt < 5) {
+      console.log(`CDN propagating… retry ${attempt + 1}/5`);
+      await new Promise((r) => setTimeout(r, 10000));
+    }
+  }
   if (live === expected && cdn === String(deployVersion)) {
     console.log(`Live bundle OK: index-${live}.js CDN deployVersion=${cdn}`);
   } else {

@@ -369,7 +369,9 @@ export async function fetchVehicleFlagForCostRecord(
     return null;
   }
 
-  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID);
+  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID, {
+    expansionLevel: 0,
+  });
   const idNorm = id.toLowerCase();
 
   const linked = rows.filter((row) => {
@@ -418,7 +420,9 @@ export async function fetchVehicleFlagHistory(
     return [];
   }
 
-  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID);
+  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID, {
+    expansionLevel: 0,
+  });
   const activeNorm = activeFeeRecordId?.trim().toLowerCase();
 
   const matched = rows.filter((row) => {

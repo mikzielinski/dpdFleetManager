@@ -517,20 +517,26 @@ export default function App() {
         if (carReg !== '—') {
           setVehicleHistoryLoading(true);
           try {
-            const [history, linkedFlag] = await Promise.all([
-              fetchVehicleFlagHistory(sdk, carReg, id),
-              fetchVehicleFlagForCostRecord(sdk, id, carReg),
-            ]);
+            const history = await fetchVehicleFlagHistory(sdk, carReg, id);
             setVehicleHistory(history);
-            setActiveVehicleFlag(linkedFlag);
           } catch (e) {
             setVehicleHistoryError(e instanceof Error ? e.message : String(e));
           } finally {
             setVehicleHistoryLoading(false);
           }
+          try {
+            const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id, carReg);
+            setActiveVehicleFlag(linkedFlag);
+          } catch {
+            setActiveVehicleFlag(null);
+          }
         } else {
-          const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id);
-          setActiveVehicleFlag(linkedFlag);
+          try {
+            const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id);
+            setActiveVehicleFlag(linkedFlag);
+          } catch {
+            setActiveVehicleFlag(null);
+          }
         }
 
         const file = await downloadInvoiceBlob(
