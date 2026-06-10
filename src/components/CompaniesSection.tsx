@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { FleetCostStats } from '../services/fleetStats';
 import type { CompanyCatalogData, CompanyCatalogItem } from '../services/companyCatalog';
 import { vehiclesForCompany } from '../services/companyCatalog';
@@ -5,12 +6,23 @@ import type { HealthScoreResult } from '../utils/healthScore';
 import { healthGradeClass } from '../utils/healthScore';
 import type { VehicleCatalogItem } from '../services/vehicleCatalog';
 import { FleetStatsPanel } from './FleetStatsPanel';
+import { SortableDataTable, type DataTableColumn } from './SortableDataTable';
+import {
+  applyTableView,
+  type ColumnFilters,
+  type TableSortState,
+} from '../utils/sortableTable';
 
 interface Props {
   catalog: CompanyCatalogData | null;
   loading: boolean;
   error: string | null;
-  filtered: CompanyCatalogItem[];
+  rows: CompanyCatalogItem[];
+  columns: DataTableColumn<CompanyCatalogItem>[];
+  sort: TableSortState | null;
+  onSortChange: (sort: TableSortState | null) => void;
+  columnFilters: ColumnFilters;
+  onColumnFiltersChange: (filters: ColumnFilters) => void;
   fleetVehicles: VehicleCatalogItem[];
   activeCompanyId: string | null;
   activeCompanyStats: FleetCostStats | null;
@@ -25,7 +37,12 @@ export function CompaniesSection({
   catalog,
   loading,
   error,
-  filtered,
+  rows,
+  columns,
+  sort,
+  onSortChange,
+  columnFilters,
+  onColumnFiltersChange,
   fleetVehicles,
   activeCompanyId,
   activeCompanyStats,
@@ -35,13 +52,77 @@ export function CompaniesSection({
   onOpenVehicle,
   onExportCompanyPdf,
 }: Props) {
+  const [assignedSort, setAssignedSort] = useState<TableSortState | null>(null);
+  const [assignedFilters, setAssignedFilters] = useState<ColumnFilters>({});
+
   const active =
     activeCompanyId && catalog
-      ? filtered.find((c) => c.id === activeCompanyId) ??
+      ? rows.find((c) => c.id === activeCompanyId) ??
         catalog.companies.find((c) => c.id === activeCompanyId) ??
         null
       : null;
   const assigned = active ? vehiclesForCompany(fleetVehicles, active.name) : [];
+
+  const assignedColumns = useMemo((): DataTableColumn<VehicleCatalogItem>[] => [
+    {
+      key: 'registration',
+      label: 'Rejestracja',
+      render: (v) => v.registration,
+      sortValue: (v) => v.registration,
+      filterText: (v) => v.registration,
+    },
+    {
+      key: 'areaLabel',
+      label: 'Region',
+      render: (v) => v.areaLabel || '—',
+      sortValue: (v) => v.areaLabel,
+      filterText: (v) => v.areaLabel,
+    },
+    {
+      key: 'rate',
+      label: 'Rate',
+      align: 'right',
+      render: (v) =>
+        v.healthGrade ? (
+          <span className={healthGradeClass(v.healthGrade)}>{v.healthGrade}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (v) => v.healthGrade ?? '',
+      filterText: (v) => v.healthGrade ?? '',
+    },
+    {
+      key: 'healthScore',
+      label: 'Health',
+      align: 'right',
+      render: (v) =>
+        v.healthGrade ? (
+          <span className={healthGradeClass(v.healthGrade)}>{v.healthScore}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (v) => v.healthScore ?? null,
+      filterText: (v) => (v.healthScore != null ? String(v.healthScore) : ''),
+    },
+  ], []);
+
+  const assignedColumnKeys = useMemo(
+    () => assignedColumns.map((c) => c.key),
+    [assignedColumns],
+  );
+
+  const displayAssigned = useMemo(
+    () =>
+      applyTableView(
+        assigned,
+        assignedSort,
+        assignedFilters,
+        assignedColumnKeys,
+        (v, key) => assignedColumns.find((c) => c.key === key)?.filterText?.(v) ?? '',
+        (v, key) => assignedColumns.find((c) => c.key === key)?.sortValue?.(v) ?? '',
+      ),
+    [assigned, assignedSort, assignedFilters, assignedColumnKeys, assignedColumns],
+  );
 
   return (
     <div className="layout master-detail-layout">
@@ -56,56 +137,20 @@ export function CompaniesSection({
         {error && <p className="error-text">{error}</p>}
 
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Firma</th>
-                <th>Region / miasto</th>
-                <th className="col-numeric">Health</th>
-                <th className="col-numeric">Koszty</th>
-                <th className="col-numeric">Pojazdy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="center">
-                    Ładowanie słownika firm…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="center">
-                    {catalog ? 'Brak firm spełniających filtry.' : 'Brak danych firm.'}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={activeCompanyId === c.id ? 'row-active' : ''}
-                    onClick={() => onSelectCompany(c.id)}
-                  >
-                    <td>{c.name}</td>
-                    <td>{c.areaLabel || '—'}</td>
-                    <td className="col-numeric">
-                      {c.healthGrade ? (
-                        <span className={healthGradeClass(c.healthGrade)}>{c.healthScore}</span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="col-numeric">
-                      {c.totalCost != null && c.totalCost > 0
-                        ? c.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
-                        : '—'}
-                    </td>
-                    <td className="col-numeric">{c.vehicleCount}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <SortableDataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(c) => c.id}
+            sort={sort}
+            onSortChange={onSortChange}
+            columnFilters={columnFilters}
+            onColumnFiltersChange={onColumnFiltersChange}
+            onRowClick={(c) => onSelectCompany(c.id)}
+            activeRowKey={activeCompanyId}
+            loading={loading}
+            loadingMessage="Ładowanie słownika firm…"
+            emptyMessage={catalog ? 'Brak firm spełniających filtry.' : 'Brak danych firm.'}
+          />
         </div>
       </section>
 
@@ -145,38 +190,17 @@ export function CompaniesSection({
 
             <h3 className="section-title">Pojazdy B2B</h3>
             <div className="table-wrap table-wrap-nested">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Rejestracja</th>
-                    <th>Region</th>
-                    <th className="col-numeric">Health</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {assigned.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="center">
-                        Brak pojazdów przypisanych do tej firmy w katalogu floty.
-                      </td>
-                    </tr>
-                  ) : (
-                    assigned.map((v) => (
-                      <tr key={v.id} onClick={() => onOpenVehicle(v.registration)}>
-                        <td>{v.registration}</td>
-                        <td>{v.areaLabel || '—'}</td>
-                        <td className="col-numeric">
-                          {v.healthGrade ? (
-                            <span className={healthGradeClass(v.healthGrade)}>{v.healthScore}</span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <SortableDataTable
+                columns={assignedColumns}
+                rows={displayAssigned}
+                rowKey={(v) => v.id}
+                sort={assignedSort}
+                onSortChange={setAssignedSort}
+                columnFilters={assignedFilters}
+                onColumnFiltersChange={setAssignedFilters}
+                onRowClick={(v) => onOpenVehicle(v.registration)}
+                emptyMessage="Brak pojazdów przypisanych do tej firmy w katalogu floty."
+              />
             </div>
             <p className="hint-small">Kliknij rejestrację, aby przejść do zakładki Pojazdy.</p>
           </>
