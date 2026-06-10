@@ -1,7 +1,7 @@
 /**
  * Staging deploy (Node) — mirrors .uipath/deploy-dpdmonitoring.ps1
  * Requires: uip login --authority https://staging.uipath.com/identity_ ...
- * Usage: node scripts/deploy-staging.mjs [semver]  (default 1.1.2)
+ * Usage: node scripts/deploy-staging.mjs [semver]  (default: version z package.json)
  */
 import { execSync } from 'child_process';
 import fs from 'fs';
@@ -11,7 +11,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const version = process.argv[2] || '1.1.3';
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+const version = process.argv[2] || pkgVersion;
 const envName = process.argv.includes('--production') ? 'production' : 'staging';
 
 const cfgPath = path.join(root, '.uipath', `deploy-config.${envName}.json`);
@@ -287,6 +288,9 @@ async function main() {
       `Still serving index-${live}.js (expected index-${expected}.js, CDN=${cdn} want ${deployVersion}) — Ctrl+Shift+R`,
     );
   }
+
+  console.log('==> Clean old artifacts');
+  execSync('node scripts/clean-artifacts.mjs --keep-latest', { cwd: root, stdio: 'inherit' });
 
   console.log('\nDone. App URL:', cfg.hostedBaseUrl);
 }

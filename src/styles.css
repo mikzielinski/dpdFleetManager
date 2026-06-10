@@ -490,6 +490,37 @@ tbody tr:hover {
   text-decoration: underline;
 }
 
+.detail-long-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.detail-long-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.detail-long-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: none;
+}
+
+.detail-long-value {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #222;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .placeholder {
   color: #666;
   padding: 40px 0;
