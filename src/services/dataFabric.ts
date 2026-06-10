@@ -354,6 +354,55 @@ export async function fetchAllEntityRecords(
   return items;
 }
 
+/** Flag linked to a specific DPD_POC cost record (Related Cost Record ID), or latest for registration. */
+export async function fetchVehicleFlagForCostRecord(
+  sdk: UiPath,
+  costRecordId: string,
+  carRegistration?: string,
+): Promise<VehicleFlagHistoryItem | null> {
+  const id = costRecordId.trim();
+  if (!id) return null;
+
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    return null;
+  }
+
+  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID);
+  const idNorm = id.toLowerCase();
+
+  const linked = rows.filter((row) => {
+    const related = pickVehicleFlagField(row, 'relatedCostRecordId');
+    return related !== '—' && related.trim().toLowerCase() === idNorm;
+  });
+
+  const pool = linked.length > 0 ? linked : carRegistration?.trim()
+    ? rows.filter((row) =>
+        registrationsMatch(carRegistration, pickVehicleFlagField(row, 'vehicleId')),
+      )
+    : [];
+
+  if (pool.length === 0) return null;
+
+  pool.sort((a, b) => {
+    const da = Date.parse(pickVehicleFlagField(a, 'flaggedAt')) || 0;
+    const db = Date.parse(pickVehicleFlagField(b, 'flaggedAt')) || 0;
+    return db - da;
+  });
+
+  const row = pool[0];
+  return {
+    id: recordId(row),
+    vehicleId: pickVehicleFlagField(row, 'vehicleId'),
+    flaggedAt: pickVehicleFlagField(row, 'flaggedAt'),
+    description: pickVehicleFlagField(row, 'description'),
+    requiresAction: pickVehicleFlagField(row, 'requiresAction'),
+    aiConfidenceScore: pickVehicleFlagField(row, 'aiConfidenceScore'),
+    relatedCostRecordId: pickVehicleFlagField(row, 'relatedCostRecordId'),
+    raw: row,
+  };
+}
+
 /** Previous flags for the same registration (DPD_VehicleFlags), excluding the active fee record when linked. */
 export async function fetchVehicleFlagHistory(
   sdk: UiPath,

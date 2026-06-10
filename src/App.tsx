@@ -9,6 +9,7 @@ import {
   fetchAllDpdRecords,
   fetchRecordById,
   fetchRecordsPage,
+  fetchVehicleFlagForCostRecord,
   fetchVehicleFlagHistory,
   loadEntityContext,
   translateRecord,
@@ -78,6 +79,11 @@ import {
   type DpdRecord,
 } from './utils/record';
 import { DEFAULT_VEHICLE_FILTERS, type VehicleFilterState } from './utils/vehicleFilters';
+import {
+  enrichRecordForDetailView,
+  pickDetailField,
+  type DetailEnrichmentContext,
+} from './utils/detailRecord';
 
 export default function App() {
   const {
@@ -123,6 +129,7 @@ export default function App() {
   const [vehicleHistory, setVehicleHistory] = useState<VehicleFlagHistoryItem[]>([]);
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
+  const [activeVehicleFlag, setActiveVehicleFlag] = useState<VehicleFlagHistoryItem | null>(null);
 
   const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies'>('claims');
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
@@ -491,6 +498,7 @@ export default function App() {
       setInvoiceBlob(null);
       setVehicleHistory([]);
       setVehicleHistoryError(null);
+      setActiveVehicleFlag(null);
       try {
         const rec = await fetchRecordById(sdk, id);
         const maps = ctxRef.current?.choiceMaps ?? new Map();
@@ -501,13 +509,20 @@ export default function App() {
         if (carReg !== '—') {
           setVehicleHistoryLoading(true);
           try {
-            const history = await fetchVehicleFlagHistory(sdk, carReg, id);
+            const [history, linkedFlag] = await Promise.all([
+              fetchVehicleFlagHistory(sdk, carReg, id),
+              fetchVehicleFlagForCostRecord(sdk, id, carReg),
+            ]);
             setVehicleHistory(history);
+            setActiveVehicleFlag(linkedFlag);
           } catch (e) {
             setVehicleHistoryError(e instanceof Error ? e.message : String(e));
           } finally {
             setVehicleHistoryLoading(false);
           }
+        } else {
+          const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id);
+          setActiveVehicleFlag(linkedFlag);
         }
 
         const file = await downloadInvoiceBlob(
@@ -660,6 +675,25 @@ export default function App() {
     if (!activeId) return null;
     return storedResults[activeId] ?? null;
   }, [activeId, storedResults]);
+
+  const detailContext = useMemo((): DetailEnrichmentContext => {
+    return {
+      analysis: activeResults,
+      vehicleFlag: activeVehicleFlag,
+      fileFields: ctx?.fileFields ?? [],
+    };
+  }, [activeResults, activeVehicleFlag, ctx?.fileFields]);
+
+  const detailRecord = useMemo(() => {
+    if (!activeRecord) return null;
+    return enrichRecordForDetailView(activeRecord, detailContext);
+  }, [activeRecord, detailContext]);
+
+  useEffect(() => {
+    if (detailRecord && import.meta.env.DEV) {
+      (window as Window & { __lastRecord?: DpdRecord }).__lastRecord = detailRecord;
+    }
+  }, [detailRecord]);
 
   const onRowClick = (r: DpdRecord) => {
     const id = recordId(r);
@@ -989,7 +1023,11 @@ export default function App() {
                         ].map((key) => (
                           <div key={key} className="detail-item">
                             <dt>{key}</dt>
-                            <dd>{pickField(activeRecord, key)}</dd>
+                            <dd>
+                              {detailRecord
+                                ? pickDetailField(detailRecord, key, detailContext)
+                                : pickField(activeRecord, key)}
+                            </dd>
                           </div>
                         ))}
                       </dl>
