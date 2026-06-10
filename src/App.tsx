@@ -5,6 +5,7 @@ import { usePolling } from './hooks/usePolling';
 import {
   DETAIL_FIELD_KEYS,
   DETAIL_FIELD_LABELS,
+  DETAIL_FULL_WIDTH_FIELDS,
   DETAIL_OPTIONAL_FIELDS,
   ORCHESTRATOR_RELEASE_NAME,
   PAGE_SIZE,
@@ -779,6 +780,42 @@ export default function App() {
     ctx?.fileFields,
   ]);
 
+  const fullWidthFieldSet = useMemo(
+    () => new Set<string>(DETAIL_FULL_WIDTH_FIELDS),
+    [],
+  );
+
+  const visibleGridFields = useMemo(
+    () => visibleDetailFields.filter((key) => !fullWidthFieldSet.has(key)),
+    [visibleDetailFields, fullWidthFieldSet],
+  );
+
+  const visibleLongFields = useMemo(
+    () => visibleDetailFields.filter((key) => fullWidthFieldSet.has(key)),
+    [visibleDetailFields, fullWidthFieldSet],
+  );
+
+  const renderDetailFieldValue = (key: string) => {
+    if (key === 'invoiceFileName') {
+      if (invoiceLoading) return <span className="hint-small">Pobieranie załącznika…</span>;
+      if (invoiceDownloadUrl) {
+        return (
+          <a
+            className="invoice-download-link"
+            href={invoiceDownloadUrl}
+            download={invoiceDownloadName}
+            title={invoiceDownloadName}
+          >
+            Pobierz
+          </a>
+        );
+      }
+      return '—';
+    }
+    if (detailRecord) return pickDetailField(detailRecord, key, detailContext);
+    return pickField(activeRecord!, key);
+  };
+
   const onRowClick = (r: DpdRecord) => {
     const id = recordId(r);
     if (id) void selectRecord(id);
@@ -1100,33 +1137,26 @@ export default function App() {
                     <div className="detail-split-main">
                       <h3 className="section-title">Szczegóły zgłoszenia</h3>
                       <dl className="detail-grid">
-                        {visibleDetailFields.map((key) => (
+                        {visibleGridFields.map((key) => (
                           <div key={key} className="detail-item">
                             <dt>{DETAIL_FIELD_LABELS[key] ?? key}</dt>
-                            <dd>
-                              {key === 'invoiceFileName' ? (
-                                invoiceLoading ? (
-                                  <span className="hint-small">Pobieranie załącznika…</span>
-                                ) : invoiceDownloadUrl ? (
-                                  <a
-                                    className="invoice-download-link"
-                                    href={invoiceDownloadUrl}
-                                    download={invoiceDownloadName}
-                                  >
-                                    Pobierz {invoiceDownloadName}
-                                  </a>
-                                ) : (
-                                  '—'
-                                )
-                              ) : detailRecord ? (
-                                pickDetailField(detailRecord, key, detailContext)
-                              ) : (
-                                pickField(activeRecord, key)
-                              )}
-                            </dd>
+                            <dd>{renderDetailFieldValue(key)}</dd>
                           </div>
                         ))}
                       </dl>
+
+                      {visibleLongFields.length > 0 ? (
+                        <div className="detail-long-fields">
+                          {visibleLongFields.map((key) => (
+                            <div key={key} className="detail-long-item">
+                              <h4 className="detail-long-label">
+                                {DETAIL_FIELD_LABELS[key] ?? key}
+                              </h4>
+                              <p className="detail-long-value">{renderDetailFieldValue(key)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
 
                     <aside className="detail-split-preview">
