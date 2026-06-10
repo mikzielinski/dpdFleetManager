@@ -1050,6 +1050,65 @@ tbody tr:hover {
   background: #fff5f5;
 }
 
+.sortable-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sortable-head-row th {
+  vertical-align: bottom;
+  padding-bottom: 4px;
+}
+
+.sortable-filter-row th {
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+
+.sortable-head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sortable-head-btn:hover {
+  color: #dc0032;
+}
+
+.sortable-indicator {
+  font-size: 11px;
+  color: #888;
+  min-width: 12px;
+}
+
+.sortable-head-label {
+  font-weight: 700;
+}
+
+.column-filter-input {
+  width: 100%;
+  min-width: 48px;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 11px;
+  background: #fff;
+}
+
+.column-filter-input:focus {
+  outline: none;
+  border-color: #dc0032;
+}
+
 .main-nav-btn-report {
   margin-left: auto;
   border-color: #dc0032;

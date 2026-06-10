@@ -31,6 +31,7 @@ import { CompliancePanel } from './components/CompliancePanel';
 import { DashboardSection } from './components/DashboardSection';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
 import { InsightsSection } from './components/InsightsSection';
+import { SortableDataTable, type DataTableColumn } from './components/SortableDataTable';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import {
   DEFAULT_CLAIMS_FILTERS,
@@ -56,6 +57,7 @@ import {
   filterCompanyCatalog,
   loadCompanyCatalog,
   type CompanyCatalogData,
+  type CompanyCatalogItem,
 } from './services/companyCatalog';
 import {
   fleetMedianCostPerClaim,
@@ -76,7 +78,12 @@ import {
   type VehicleCatalogData,
   type VehicleCatalogItem,
 } from './services/vehicleCatalog';
-import { computeHealthScore } from './utils/healthScore';
+import { computeHealthScore, healthGradeClass } from './utils/healthScore';
+import {
+  applyTableView,
+  type ColumnFilters,
+  type TableSortState,
+} from './utils/sortableTable';
 import { extractVehicleCompliance } from './utils/vehicleCompliance';
 import {
   DEFAULT_COMPANY_FILTERS,
@@ -159,6 +166,13 @@ export default function App() {
   const [companyFilters, setCompanyFilters] = useState<CompanyFilterState>(DEFAULT_COMPANY_FILTERS);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
+  const [claimsSort, setClaimsSort] = useState<TableSortState | null>(null);
+  const [claimsColumnFilters, setClaimsColumnFilters] = useState<ColumnFilters>({});
+  const [vehiclesSort, setVehiclesSort] = useState<TableSortState | null>(null);
+  const [vehiclesColumnFilters, setVehiclesColumnFilters] = useState<ColumnFilters>({});
+  const [companiesSort, setCompaniesSort] = useState<TableSortState | null>(null);
+  const [companiesColumnFilters, setCompaniesColumnFilters] = useState<ColumnFilters>({});
+
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
 
   const globalFilterActive = useMemo(
@@ -171,13 +185,63 @@ export default function App() {
     [records, tableColumns, claimFilters],
   );
 
-  const filteredPageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE) || 1);
+  const claimDataColumns = useMemo((): DataTableColumn<DpdRecord>[] => {
+    const numericKeys = new Set(['netPrice', 'grossPrice', 'amount', 'totalPrice']);
+    return tableColumns.map((col) => ({
+      key: col.key,
+      label: col.label,
+      align: numericKeys.has(col.key) ? ('right' as const) : ('left' as const),
+      render: (r) => displayField(r, col),
+      sortValue: (r) => {
+        const text = displayField(r, col);
+        if (numericKeys.has(col.key)) {
+          const n = Number.parseFloat(text.replace(/\s/g, '').replace(',', '.'));
+          return Number.isFinite(n) ? n : text;
+        }
+        return text;
+      },
+      filterText: (r) => displayField(r, col),
+    }));
+  }, [tableColumns]);
+
+  const claimColumnKeys = useMemo(
+    () => claimDataColumns.map((c) => c.key),
+    [claimDataColumns],
+  );
+
+  const tableViewRecords = useMemo(
+    () =>
+      applyTableView(
+        filteredRecords,
+        claimsSort,
+        claimsColumnFilters,
+        claimColumnKeys,
+        (r, key) => {
+          const col = tableColumns.find((c) => c.key === key);
+          return col ? displayField(r, col) : '';
+        },
+        (r, key) => {
+          const col = claimDataColumns.find((c) => c.key === key);
+          return col?.sortValue?.(r) ?? '';
+        },
+      ),
+    [
+      filteredRecords,
+      claimsSort,
+      claimsColumnFilters,
+      claimColumnKeys,
+      tableColumns,
+      claimDataColumns,
+    ],
+  );
+
+  const filteredPageCount = Math.max(1, Math.ceil(tableViewRecords.length / PAGE_SIZE) || 1);
 
   const displayRecords = useMemo(() => {
-    if (!globalFilterActive) return filteredRecords;
+    if (!globalFilterActive) return tableViewRecords;
     const start = pageIndex * PAGE_SIZE;
-    return filteredRecords.slice(start, start + PAGE_SIZE);
-  }, [globalFilterActive, filteredRecords, pageIndex]);
+    return tableViewRecords.slice(start, start + PAGE_SIZE);
+  }, [globalFilterActive, tableViewRecords, pageIndex]);
 
   const prevGlobalFilterRef = useRef(false);
 
@@ -282,6 +346,194 @@ export default function App() {
       vehicleIdsByPlate,
     );
   }, [allPocCosts, vehicleCatalog, vehicleIdsByPlate]);
+
+  type VehicleTableRow = VehicleCatalogItem & { pocCount: number };
+
+  const vehicleDataColumns = useMemo((): DataTableColumn<VehicleTableRow>[] => [
+    {
+      key: 'registration',
+      label: 'Pojazd',
+      render: (v) => v.registration,
+      sortValue: (v) => v.registration,
+      filterText: (v) => v.registration,
+    },
+    {
+      key: 'areaLabel',
+      label: 'Region / miasto',
+      render: (v) => v.areaLabel || '—',
+      sortValue: (v) => v.areaLabel,
+      filterText: (v) => v.areaLabel,
+    },
+    {
+      key: 'companyLabel',
+      label: 'Firma kurierska',
+      render: (v) => v.companyLabel || '—',
+      sortValue: (v) => v.companyLabel,
+      filterText: (v) => v.companyLabel,
+    },
+    {
+      key: 'rate',
+      label: 'Rate',
+      align: 'right',
+      render: (v) =>
+        v.healthGrade ? (
+          <span className={healthGradeClass(v.healthGrade)}>{v.healthGrade}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (v) => v.healthGrade ?? '',
+      filterText: (v) => v.healthGrade ?? '',
+    },
+    {
+      key: 'healthScore',
+      label: 'Health',
+      align: 'right',
+      render: (v) =>
+        v.healthScore != null ? (
+          <span className={v.healthGrade ? healthGradeClass(v.healthGrade) : ''}>{v.healthScore}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (v) => v.healthScore ?? null,
+      filterText: (v) => (v.healthScore != null ? String(v.healthScore) : ''),
+    },
+    {
+      key: 'totalCost',
+      label: 'Koszty',
+      align: 'right',
+      render: (v) =>
+        v.totalCost != null && v.totalCost > 0
+          ? v.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
+          : '—',
+      sortValue: (v) => v.totalCost ?? null,
+      filterText: (v) => (v.totalCost != null ? String(v.totalCost) : ''),
+    },
+    {
+      key: 'pocCount',
+      label: 'POC',
+      align: 'right',
+      render: (v) => v.pocCount,
+      sortValue: (v) => v.pocCount,
+      filterText: (v) => String(v.pocCount),
+    },
+  ], []);
+
+  const vehicleColumnKeys = useMemo(
+    () => vehicleDataColumns.map((c) => c.key),
+    [vehicleDataColumns],
+  );
+
+  const vehicleTableRows = useMemo((): VehicleTableRow[] => {
+    return filteredVehicles.map((v) => ({
+      ...v,
+      pocCount: pocCountByVehicleId.get(v.id) ?? 0,
+    }));
+  }, [filteredVehicles, pocCountByVehicleId]);
+
+  const displayVehicles = useMemo(
+    () =>
+      applyTableView(
+        vehicleTableRows,
+        vehiclesSort,
+        vehiclesColumnFilters,
+        vehicleColumnKeys,
+        (v, key) => vehicleDataColumns.find((c) => c.key === key)?.filterText?.(v) ?? '',
+        (v, key) => vehicleDataColumns.find((c) => c.key === key)?.sortValue?.(v) ?? '',
+      ),
+    [
+      vehicleTableRows,
+      vehiclesSort,
+      vehiclesColumnFilters,
+      vehicleColumnKeys,
+      vehicleDataColumns,
+    ],
+  );
+
+  const companyDataColumns = useMemo((): DataTableColumn<CompanyCatalogItem>[] => [
+    {
+      key: 'name',
+      label: 'Firma',
+      render: (c) => c.name,
+      sortValue: (c) => c.name,
+      filterText: (c) => c.name,
+    },
+    {
+      key: 'areaLabel',
+      label: 'Region / miasto',
+      render: (c) => c.areaLabel || '—',
+      sortValue: (c) => c.areaLabel,
+      filterText: (c) => c.areaLabel,
+    },
+    {
+      key: 'rate',
+      label: 'Rate',
+      align: 'right',
+      render: (c) =>
+        c.healthGrade ? (
+          <span className={healthGradeClass(c.healthGrade)}>{c.healthGrade}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (c) => c.healthGrade ?? '',
+      filterText: (c) => c.healthGrade ?? '',
+    },
+    {
+      key: 'healthScore',
+      label: 'Health',
+      align: 'right',
+      render: (c) =>
+        c.healthScore != null ? (
+          <span className={c.healthGrade ? healthGradeClass(c.healthGrade) : ''}>{c.healthScore}</span>
+        ) : (
+          '—'
+        ),
+      sortValue: (c) => c.healthScore ?? null,
+      filterText: (c) => (c.healthScore != null ? String(c.healthScore) : ''),
+    },
+    {
+      key: 'totalCost',
+      label: 'Koszty',
+      align: 'right',
+      render: (c) =>
+        c.totalCost != null && c.totalCost > 0
+          ? c.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
+          : '—',
+      sortValue: (c) => c.totalCost ?? null,
+      filterText: (c) => (c.totalCost != null ? String(c.totalCost) : ''),
+    },
+    {
+      key: 'vehicleCount',
+      label: 'Pojazdy',
+      align: 'right',
+      render: (c) => c.vehicleCount,
+      sortValue: (c) => c.vehicleCount,
+      filterText: (c) => String(c.vehicleCount),
+    },
+  ], []);
+
+  const companyColumnKeys = useMemo(
+    () => companyDataColumns.map((c) => c.key),
+    [companyDataColumns],
+  );
+
+  const displayCompanies = useMemo(
+    () =>
+      applyTableView(
+        filteredCompanies,
+        companiesSort,
+        companiesColumnFilters,
+        companyColumnKeys,
+        (c, key) => companyDataColumns.find((x) => x.key === key)?.filterText?.(c) ?? '',
+        (c, key) => companyDataColumns.find((x) => x.key === key)?.sortValue?.(c) ?? '',
+      ),
+    [
+      filteredCompanies,
+      companiesSort,
+      companiesColumnFilters,
+      companyColumnKeys,
+      companyDataColumns,
+    ],
+  );
 
   const activeVehicle = useMemo((): VehicleCatalogItem | null => {
     if (!activeVehicleId) return null;
@@ -1009,11 +1261,11 @@ export default function App() {
         decisionOptions={decisionOptions}
         filteredCount={
           mainSection === 'claims'
-            ? filteredRecords.length
+            ? tableViewRecords.length
             : mainSection === 'vehicles'
-              ? filteredVehicles.length
+              ? displayVehicles.length
               : mainSection === 'companies'
-                ? filteredCompanies.length
+                ? displayCompanies.length
                 : allPocCosts.length
         }
         totalCount={
@@ -1072,80 +1324,49 @@ export default function App() {
               {tableError && <p className="error-text">{tableError}</p>}
 
               <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>
-                        <input
-                          type="checkbox"
-                          checked={
-                            displayRecords.length > 0 &&
-                            displayRecords.every((r) => selectedIds.has(recordId(r)))
-                          }
-                          onChange={toggleSelectAllPage}
-                        />
-                      </th>
-                      {tableColumns.map((c) => (
-                        <th key={c.key}>{c.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingTable ? (
-                      <tr>
-                        <td colSpan={tableColumns.length + 1} className="center">
-                          {globalFilterActive
-                            ? 'Ładowanie wszystkich zgłoszeń…'
-                            : 'Ładowanie…'}
-                        </td>
-                      </tr>
-                    ) : filteredRecords.length === 0 ? (
-                      <tr>
-                        <td colSpan={tableColumns.length + 1} className="center">
-                          {records.length === 0 ? (
-                            <>
-                              Brak zgłoszeń.
-                              {!tableError && !loadingTable && sdkReady ? (
-                                <>
-                                  {' '}
-                                  Spróbuj odświeżyć stronę lub zaloguj się ponownie (sesja OAuth mogła
-                                  wygasnąć).
-                                </>
-                              ) : null}
-                            </>
-                          ) : globalFilterActive ? (
-                            `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
-                          ) : (
-                            `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`
-                          )}
-                        </td>
-                      </tr>
-                    ) : (
-                      displayRecords.map((r) => {
-                        const id = recordId(r);
-                        const selected = id === activeId;
-                        return (
-                          <tr
-                            key={id}
-                            className={selected ? 'row-active' : ''}
-                            onClick={() => onRowClick(r)}
-                          >
-                            <td onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(id)}
-                                onChange={() => toggleSelect(id)}
-                              />
-                            </td>
-                            {tableColumns.map((c) => (
-                              <td key={c.key}>{displayField(r, c)}</td>
-                            ))}
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                <SortableDataTable
+                  columns={claimDataColumns}
+                  rows={loadingTable ? [] : displayRecords}
+                  rowKey={(r) => recordId(r)}
+                  sort={claimsSort}
+                  onSortChange={setClaimsSort}
+                  columnFilters={claimsColumnFilters}
+                  onColumnFiltersChange={setClaimsColumnFilters}
+                  onRowClick={onRowClick}
+                  activeRowKey={activeId}
+                  loading={loadingTable}
+                  loadingMessage={
+                    globalFilterActive ? 'Ładowanie wszystkich zgłoszeń…' : 'Ładowanie…'
+                  }
+                  emptyMessage={
+                    records.length === 0
+                      ? 'Brak zgłoszeń.'
+                      : tableViewRecords.length === 0
+                        ? globalFilterActive
+                          ? `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
+                          : `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`
+                        : 'Brak danych.'
+                  }
+                  leadingHeader={
+                    <input
+                      type="checkbox"
+                      checked={
+                        displayRecords.length > 0 &&
+                        displayRecords.every((r) => selectedIds.has(recordId(r)))
+                      }
+                      onChange={toggleSelectAllPage}
+                      aria-label="Zaznacz wszystkie na stronie"
+                    />
+                  }
+                  renderLeadingCell={(r) => (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(recordId(r))}
+                      onChange={() => toggleSelect(recordId(r))}
+                      aria-label="Zaznacz wiersz"
+                    />
+                  )}
+                />
               </div>
 
               <div className="pager">
@@ -1167,8 +1388,8 @@ export default function App() {
                 </button>
                 <span>
                   Strona {pageIndex + 1}
-                  {globalFilterActive && filteredRecords.length > 0
-                    ? ` z ${filteredPageCount} (${filteredRecords.length} pasujących)`
+                  {globalFilterActive && tableViewRecords.length > 0
+                    ? ` z ${filteredPageCount} (${tableViewRecords.length} pasujących)`
                     : ''}
                 </span>
                 <button
@@ -1318,66 +1539,24 @@ export default function App() {
               {vehicleCatalogError && <p className="error-text">{vehicleCatalogError}</p>}
 
               <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Pojazd</th>
-                      <th>Region / miasto</th>
-                      <th>Firma kurierska</th>
-                      <th className="col-numeric">Health</th>
-                      <th className="col-numeric">Koszty</th>
-                      <th className="col-numeric">POC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vehicleCatalogLoading ? (
-                      <tr>
-                        <td colSpan={6} className="center">
-                          Ładowanie pojazdów i słowników regionów / firm…
-                        </td>
-                      </tr>
-                    ) : filteredVehicles.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="center">
-                          {vehicleCatalog
-                            ? 'Brak pojazdów spełniających filtry.'
-                            : 'Brak danych pojazdów.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredVehicles.map((v) => {
-                        const pocCount = pocCountByVehicleId.get(v.id) ?? 0;
-                        const selectedV = activeVehicleId === v.id;
-                        return (
-                          <tr
-                            key={v.id}
-                            className={selectedV ? 'row-active' : ''}
-                            onClick={() => setActiveVehicleId(v.id)}
-                          >
-                            <td>{v.registration}</td>
-                            <td>{v.areaLabel || '—'}</td>
-                            <td>{v.companyLabel || '—'}</td>
-                            <td className="col-numeric">
-                              {v.healthGrade ? (
-                                <span className={`health-grade health-grade-${v.healthGrade.toLowerCase()}`}>
-                                  {v.healthScore}
-                                </span>
-                              ) : (
-                                '—'
-                              )}
-                            </td>
-                            <td className="col-numeric">
-                              {v.totalCost != null && v.totalCost > 0
-                                ? v.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
-                                : '—'}
-                            </td>
-                            <td className="col-numeric">{pocCount}</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                <SortableDataTable
+                  columns={vehicleDataColumns}
+                  rows={displayVehicles}
+                  rowKey={(v) => v.id}
+                  sort={vehiclesSort}
+                  onSortChange={setVehiclesSort}
+                  columnFilters={vehiclesColumnFilters}
+                  onColumnFiltersChange={setVehiclesColumnFilters}
+                  onRowClick={(v) => setActiveVehicleId(v.id)}
+                  activeRowKey={activeVehicleId}
+                  loading={vehicleCatalogLoading}
+                  loadingMessage="Ładowanie pojazdów i słowników regionów / firm…"
+                  emptyMessage={
+                    vehicleCatalog
+                      ? 'Brak pojazdów spełniających filtry.'
+                      : 'Brak danych pojazdów.'
+                  }
+                />
               </div>
             </section>
 
@@ -1536,7 +1715,12 @@ export default function App() {
             catalog={companyCatalog}
             loading={companyCatalogLoading}
             error={companyCatalogError}
-            filtered={filteredCompanies}
+            rows={displayCompanies}
+            columns={companyDataColumns}
+            sort={companiesSort}
+            onSortChange={setCompaniesSort}
+            columnFilters={companiesColumnFilters}
+            onColumnFiltersChange={setCompaniesColumnFilters}
             fleetVehicles={enrichedVehicles}
             activeCompanyId={activeCompanyId}
             activeCompanyStats={activeCompanyStats}
