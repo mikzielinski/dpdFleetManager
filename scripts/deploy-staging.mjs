@@ -22,11 +22,14 @@ if (!fs.existsSync(cfgPath)) {
 const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
 
 const authFile = path.join(os.homedir(), '.uipath', '.auth');
-if (!fs.existsSync(authFile)) {
+const envAccessToken = process.env.UIPATH_ACCESS_TOKEN?.trim();
+const envRefreshToken = process.env.UIPATH_REFRESH_TOKEN?.trim();
+if (!fs.existsSync(authFile) && !envAccessToken) {
   console.error(`Brak sesji UiPath: ${authFile}`);
   console.error(
     'Zaloguj się: uip logout && uip login --organization mzpocevylrxu --tenant DefaultTenant --authority https://staging.uipath.com/identity_',
   );
+  console.error('Lub ustaw UIPATH_ACCESS_TOKEN (+ opcjonalnie UIPATH_REFRESH_TOKEN) w środowisku.');
   process.exit(1);
 }
 
@@ -109,7 +112,12 @@ async function main() {
   const nupkg = path.join(root, '.uipath', `${pkgId}.${version}.nupkg`);
   if (!fs.existsSync(nupkg)) throw new Error(`Missing ${nupkg}`);
 
-  const token = await refreshTokenIfNeeded(parseAuth(authFile));
+  const token = envAccessToken
+    ? await refreshTokenIfNeeded({
+        accessToken: envAccessToken,
+        refreshToken: envRefreshToken ?? '',
+      })
+    : await refreshTokenIfNeeded(parseAuth(authFile));
   const portalBase = `https://${cfg.portalHost}`;
   const appsBase = `${portalBase}/${cfg.orgId}/apps_/default/api/v1/default/models`;
 
