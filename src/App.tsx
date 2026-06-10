@@ -795,6 +795,9 @@ export default function App() {
           <div className="dpd-logo">DPD</div>
           <span className="header-sep">|</span>
           <span className="header-title">Fleet Manager — koszty kierowców</span>
+          <span className="header-version" title="Wersja aplikacji">
+            v{import.meta.env.VITE_APP_VERSION ?? '?'}
+          </span>
         </div>
         <div className="header-actions">
           {maestroTarget && (
