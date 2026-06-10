@@ -2,7 +2,7 @@ import type { CompanyFilterState } from '../utils/companyFilters';
 import type { ClaimsFilterState } from '../utils/filterRecords';
 import type { VehicleFilterState } from '../utils/vehicleFilters';
 
-type MainSection = 'claims' | 'vehicles' | 'companies';
+type MainSection = 'dashboard' | 'claims' | 'vehicles' | 'companies' | 'insights';
 
 interface Props {
   section: MainSection;
@@ -75,7 +75,9 @@ export function GlobalFilterBar({
           ? hasActiveClaimsFilters
           : section === 'vehicles'
             ? hasActiveVehicleFilters
-            : hasActiveCompanyFilters) && (
+            : section === 'companies'
+              ? hasActiveCompanyFilters
+              : false) && (
           <button type="button" className="btn btn-link-reset" onClick={onReset}>
             Wyczyść
           </button>
@@ -100,6 +102,11 @@ export function GlobalFilterBar({
             <>
               {' '}
               z <strong>{totalCount}</strong> firm B2B
+            </>
+          ) : section === 'dashboard' || section === 'insights' ? (
+            <>
+              {' '}
+              na podstawie <strong>{totalCount}</strong> rozliczeń POC
             </>
           ) : totalCount !== filteredCount ? (
             <>
@@ -145,6 +152,15 @@ export function GlobalFilterBar({
             firmy w katalogu B2B.
           </p>
         </div>
+      ) : section === 'dashboard' ? (
+        <p className="filter-hint">
+          Podsumowanie kosztów, kondycji floty i statusów na podstawie wszystkich rekordów DPD_POC.
+        </p>
+      ) : section === 'insights' ? (
+        <p className="filter-hint">
+          Analizy: oznaczenia, rankingi pojazdów i firm, pojazdy wymagające uwagi. Kliknij wiersz,
+          aby przejść do szczegółów.
+        </p>
       ) : section === 'claims' ? (
         <div className="global-filter-controls">
           <label className="filter-field filter-grow">

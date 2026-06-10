@@ -88,6 +88,9 @@ export const DETAIL_FIELD_LABELS: Record<string, string> = {
   fleetManagerNote: 'Notatka managera',
 };
 
+/** Pola z długim tekstem — pod siatką, pełna szerokość (nie w kolumnach). */
+export const DETAIL_FULL_WIDTH_FIELDS = ['comments', 'fleetManagerNote'] as const;
+
 /** Ukryj w szczegółach, gdy wartość to „—”. */
 export const DETAIL_OPTIONAL_FIELDS = [
   'decision',
