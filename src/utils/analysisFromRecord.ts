@@ -8,6 +8,61 @@ import {
   type DpdRecord,
 } from './record';
 
+const ANALYSIS_CONTENT_KEYS: (keyof AnalysisVariables)[] = [
+  'fleetManagerNote',
+  'combinedScore',
+  'riskLevel',
+  'flagType',
+  'decision',
+  'validationStatus',
+  'summary',
+  'declaredAmount',
+  'vehicleReg',
+];
+
+/** True when at least one field carries displayable AI analysis content. */
+export function hasAnalysisContent(vars: AnalysisVariables | null | undefined): boolean {
+  if (!vars) return false;
+  return ANALYSIS_CONTENT_KEYS.some((key) => {
+    const v = vars[key];
+    return v != null && String(v).trim() !== '';
+  });
+}
+
+/** Prefer session (Maestro) values; fill gaps from persisted record / VehicleFlags. */
+export function mergeAnalysisVariables(
+  session?: AnalysisVariables | null,
+  persisted?: AnalysisVariables | null,
+): AnalysisVariables | null {
+  if (!hasAnalysisContent(session) && !hasAnalysisContent(persisted)) {
+    return null;
+  }
+  if (!hasAnalysisContent(session)) return persisted ?? null;
+  if (!hasAnalysisContent(persisted)) return session ?? null;
+
+  const pick = (key: keyof AnalysisVariables): string | undefined => {
+    const fromSession = session?.[key];
+    if (fromSession != null && String(fromSession).trim()) return String(fromSession);
+    const fromPersisted = persisted?.[key];
+    if (fromPersisted != null && String(fromPersisted).trim()) return String(fromPersisted);
+    return undefined;
+  };
+
+  return {
+    recordId: session?.recordId ?? persisted?.recordId,
+    fleetManagerNote: pick('fleetManagerNote'),
+    combinedScore: pick('combinedScore'),
+    riskLevel: pick('riskLevel'),
+    flagType: pick('flagType'),
+    decision: pick('decision'),
+    validationStatus: pick('validationStatus'),
+    summary: pick('summary'),
+    vehicleReg: pick('vehicleReg'),
+    declaredAmount: pick('declaredAmount'),
+    latestRunStatus: session?.latestRunStatus ?? persisted?.latestRunStatus,
+  };
+}
+
 function pickNonEmpty(r: DpdRecord, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const v = pickField(r, key);

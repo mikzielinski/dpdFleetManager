@@ -389,11 +389,19 @@ export async function fetchVehicleFlagForCostRecord(
     return related !== '—' && related.trim().toLowerCase() === idNorm;
   });
 
-  const pool = linked.length > 0 ? linked : carRegistration?.trim()
-    ? rows.filter((row) =>
-        registrationsMatch(carRegistration, pickVehicleFlagField(row, 'vehicleId')),
-      )
-    : [];
+  const pool =
+    linked.length > 0
+      ? linked
+      : carRegistration?.trim()
+        ? rows.filter((row) => {
+            const vehicleId = pickVehicleFlagField(row, 'vehicleId');
+            const regOnFlag = pickVehicleFlagField(row, 'carRegistration');
+            return (
+              registrationsMatch(carRegistration, vehicleId) ||
+              registrationsMatch(carRegistration, regOnFlag)
+            );
+          })
+        : [];
 
   if (pool.length === 0) return null;
 
