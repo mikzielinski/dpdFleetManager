@@ -23,8 +23,8 @@ Write-Host "==> npm install" -ForegroundColor Cyan
 npm install
 if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)" }
 
-Write-Host "==> Deploy staging 1.1.2" -ForegroundColor Cyan
-node scripts/deploy-staging.mjs 1.1.3
+Write-Host "==> Deploy staging (version z package.json)" -ForegroundColor Cyan
+node scripts/deploy-staging.mjs
 if ($LASTEXITCODE -ne 0) { throw "deploy-staging failed (exit $LASTEXITCODE)" }
 
 Write-Host ""

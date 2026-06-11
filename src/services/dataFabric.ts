@@ -116,13 +116,19 @@ export async function loadEntityContext(sdk: UiPath): Promise<EntityContext> {
   for (const field of entity.fields ?? []) {
     const csId = field.referenceChoiceSet?.id ?? (field as { choiceSetId?: string }).choiceSetId;
     if (!csId || !field.name) continue;
-    const page = await choiceSets.getById(csId, { pageSize: 200 });
-    const byId = new Map<number, string>();
-    for (const v of page.items) {
-      byId.set(v.numberId, v.displayName || v.name);
+    try {
+      const page = await choiceSets.getById(csId, { pageSize: 200 });
+      const byId = new Map<number, string>();
+      for (const v of page.items ?? []) {
+        byId.set(v.numberId, v.displayName || v.name);
+      }
+      choiceMaps.set(field.name, byId);
+      choiceMaps.set(fieldToColumnKey(field.name), byId);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn(`[DataFabric] ChoiceSet ${csId} (${field.name}):`, e);
+      }
     }
-    choiceMaps.set(field.name, byId);
-    choiceMaps.set(fieldToColumnKey(field.name), byId);
   }
 
   return { entity, fileFields, choiceMaps, tableColumns };
@@ -198,11 +204,15 @@ function normalizeRecordsPage(
   totalCount?: number;
 } {
   const r = result as Record<string, unknown>;
-  const items = (Array.isArray(r.items)
-    ? r.items
-    : Array.isArray(r.value)
-      ? r.value
-      : []) as DpdRecord[];
+  const items = (Array.isArray(r)
+    ? r
+    : Array.isArray(r.items)
+      ? r.items
+      : Array.isArray(r.value)
+        ? r.value
+        : Array.isArray(r.records)
+          ? r.records
+          : []) as DpdRecord[];
 
   const totalCount =
     typeof r.totalCount === 'number'
@@ -379,11 +389,19 @@ export async function fetchVehicleFlagForCostRecord(
     return related !== '—' && related.trim().toLowerCase() === idNorm;
   });
 
-  const pool = linked.length > 0 ? linked : carRegistration?.trim()
-    ? rows.filter((row) =>
-        registrationsMatch(carRegistration, pickVehicleFlagField(row, 'vehicleId')),
-      )
-    : [];
+  const pool =
+    linked.length > 0
+      ? linked
+      : carRegistration?.trim()
+        ? rows.filter((row) => {
+            const vehicleId = pickVehicleFlagField(row, 'vehicleId');
+            const regOnFlag = pickVehicleFlagField(row, 'carRegistration');
+            return (
+              registrationsMatch(carRegistration, vehicleId) ||
+              registrationsMatch(carRegistration, regOnFlag)
+            );
+          })
+        : [];
 
   if (pool.length === 0) return null;
 

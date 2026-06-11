@@ -117,6 +117,18 @@ export function getMetaTagContent(name: string): string {
   return document.querySelector(`meta[name="${name}"]`)?.getAttribute('content')?.trim() ?? '';
 }
 
+/**
+ * OAuth scope for SDK authorize/token.
+ * Hosted Orchestrator injects uipath:scope with all folder permissions (90+ scopes).
+ * External Application only registers the app-specific subset — using meta scope causes
+ * Identity "Invalid scope" (#200 on login). Prefer build-time VITE_UIPATH_SCOPE.
+ */
+export function resolveOAuthScope(): string {
+  const fromBuild = (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim();
+  if (fromBuild) return fromBuild;
+  return getMetaTagContent('uipath:scope');
+}
+
 /** Alternate form some Admin consoles expect (trailing slash). */
 export function getRedirectUriWithTrailingSlash(): string {
   const base = resolveRedirectUri();
@@ -168,6 +180,8 @@ export function parseOAuthUrlError(): string | null {
     invalid_account: getAccountAccessErrorHint(),
     invalid_grant:
       'Sesja logowania wygasła lub kod autoryzacji jest nieważny — spróbuj zalogować się ponownie.',
+    invalid_scope:
+      'Żądany zakres OAuth nie jest zarejestrowany w External Application. Upewnij się, że aplikacja używa scope z builda (VITE_UIPATH_SCOPE), nie pełnej listy z meta platformy.',
   };
 
   let hint =
