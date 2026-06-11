@@ -20,7 +20,10 @@ import {
   fetchRecordsPage,
   fetchVehicleFlagForCostRecord,
   fetchVehicleFlagHistory,
+  fetchVehicleFlagsIndex,
+  resolveVehicleFlagFromIndex,
   loadEntityContext,
+  type VehicleFlagsIndex,
   translateRecord,
   updateRecordStatus,
   type EntityContext,
@@ -153,6 +156,7 @@ export default function App() {
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
   const [activeVehicleFlag, setActiveVehicleFlag] = useState<VehicleFlagHistoryItem | null>(null);
+  const [vehicleFlagsIndex, setVehicleFlagsIndex] = useState<VehicleFlagsIndex | null>(null);
 
   const [mainSection, setMainSection] = useState<
     'dashboard' | 'claims' | 'vehicles' | 'companies' | 'insights'
@@ -184,9 +188,11 @@ export default function App() {
     [claimFilters],
   );
 
+  const flagsByCostId = vehicleFlagsIndex?.byCostRecordId;
+
   const filteredRecords = useMemo(
-    () => filterClaimRecords(records, tableColumns, claimFilters),
-    [records, tableColumns, claimFilters],
+    () => filterClaimRecords(records, tableColumns, claimFilters, flagsByCostId),
+    [records, tableColumns, claimFilters, flagsByCostId],
   );
 
   const claimDataColumns = useMemo((): DataTableColumn<DpdRecord>[] => {
@@ -589,8 +595,8 @@ export default function App() {
   }, [activeCompanyStats, fleetMedianCost]);
 
   const fleetStats = useMemo(
-    () => statsForFleet(allPocCosts, tableColumns),
-    [allPocCosts, tableColumns],
+    () => statsForFleet(allPocCosts, tableColumns, flagsByCostId),
+    [allPocCosts, tableColumns, flagsByCostId],
   );
 
   const fleetHealth = useMemo(
@@ -817,6 +823,22 @@ export default function App() {
     };
   }, [isAuthenticated, sdkReady, sdk]);
 
+  const refreshVehicleFlagsIndex = useCallback(async () => {
+    if (!isAuthenticated || !sdkReady) return;
+    try {
+      const index = await fetchVehicleFlagsIndex(sdk);
+      setVehicleFlagsIndex(index);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn('[DataFabric] fetchVehicleFlagsIndex:', e);
+      }
+    }
+  }, [sdk, isAuthenticated, sdkReady]);
+
+  useEffect(() => {
+    void refreshVehicleFlagsIndex();
+  }, [refreshVehicleFlagsIndex]);
+
   const selectRecord = useCallback(
     async (id: string) => {
       setActiveId(id);
@@ -825,7 +847,6 @@ export default function App() {
       setInvoiceBlob(null);
       setVehicleHistory([]);
       setVehicleHistoryError(null);
-      setActiveVehicleFlag(null);
       try {
         const rec = await fetchRecordById(sdk, id);
         const maps = ctxRef.current?.choiceMaps ?? new Map();
@@ -833,6 +854,10 @@ export default function App() {
         setActiveRecord(translated);
 
         const carReg = pickField(translated, 'carRegistration');
+        const regArg = carReg !== '—' ? carReg : undefined;
+        const indexedFlag = resolveVehicleFlagFromIndex(vehicleFlagsIndex, id, regArg);
+        setActiveVehicleFlag(indexedFlag);
+
         if (carReg !== '—') {
           setVehicleHistoryLoading(true);
           try {
@@ -845,16 +870,16 @@ export default function App() {
           }
           try {
             const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id, carReg);
-            setActiveVehicleFlag(linkedFlag);
+            setActiveVehicleFlag(linkedFlag ?? indexedFlag);
           } catch {
-            setActiveVehicleFlag(null);
+            setActiveVehicleFlag(indexedFlag);
           }
         } else {
           try {
             const linkedFlag = await fetchVehicleFlagForCostRecord(sdk, id);
-            setActiveVehicleFlag(linkedFlag);
+            setActiveVehicleFlag(linkedFlag ?? indexedFlag);
           } catch {
-            setActiveVehicleFlag(null);
+            setActiveVehicleFlag(indexedFlag);
           }
         }
 
@@ -878,7 +903,7 @@ export default function App() {
         setInvoiceLoading(false);
       }
     },
-    [sdk],
+    [sdk, vehicleFlagsIndex],
   );
 
   const toggleSelect = (id: string) => {
@@ -1011,25 +1036,27 @@ export default function App() {
         ),
       );
       setStatusMsg('Analiza zakończona.');
+      void refreshVehicleFlagsIndex();
       if (activeId) void selectRecord(activeId);
     }
-  }, [polledVars, activeRun, activeId, selectRecord]);
-
-  const recordWithFlagData = useMemo(() => {
-    if (!activeRecord) return null;
-    return enrichRecordForDetailView(activeRecord, {
-      vehicleFlag: activeVehicleFlag,
-      fileFields: ctx?.fileFields ?? [],
-    });
-  }, [activeRecord, activeVehicleFlag, ctx?.fileFields]);
+  }, [polledVars, activeRun, activeId, selectRecord, refreshVehicleFlagsIndex]);
 
   const activeResults = useMemo(() => {
     if (!activeId) return null;
     return mergeAnalysisVariables(
       storedResults[activeId],
-      analysisVariablesFromRecord(recordWithFlagData, activeVehicleFlag, activeId),
+      analysisVariablesFromRecord(activeRecord, activeVehicleFlag, activeId),
     );
-  }, [activeId, storedResults, recordWithFlagData, activeVehicleFlag]);
+  }, [activeId, storedResults, activeRecord, activeVehicleFlag]);
+
+  const analysisPendingHint = useMemo(() => {
+    if (!activeRecord || activeResults) return null;
+    const status = pickField(activeRecord, 'decision');
+    if (status !== '—' && /flagged/i.test(status)) {
+      return 'Brak zapisanego wyniku analizy w DPD_VehicleFlags. Uruchom „Analizuj (Maestro)”, aby wygenerować wynik AI.';
+    }
+    return null;
+  }, [activeRecord, activeResults]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {
@@ -1479,7 +1506,10 @@ export default function App() {
                     carRegistration={pickField(activeRecord, 'carRegistration')}
                   />
 
-                  <AnalysisResults results={activeResults} />
+                  <AnalysisResults
+                    results={activeResults}
+                    pendingHint={analysisPendingHint}
+                  />
 
                   <div className="decision-hint">
                     <p className="section-sub">Decyzja managera</p>
@@ -1714,6 +1744,7 @@ export default function App() {
             companies={enrichedCompanies}
             fleetStats={fleetStats}
             tableColumns={tableColumns}
+            flagsByCostId={flagsByCostId}
             loading={vehicleCatalogLoading || companyCatalogLoading}
             error={vehicleCatalogError ?? companyCatalogError}
             onRefresh={() => {

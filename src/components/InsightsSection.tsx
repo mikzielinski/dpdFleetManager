@@ -3,7 +3,8 @@ import { displayField } from '../services/dataFabric';
 import type { FleetCostStats } from '../services/fleetStats';
 import type { CompanyCatalogItem } from '../services/companyCatalog';
 import type { VehicleCatalogItem } from '../services/vehicleCatalog';
-import { isLikelyFlagged, getRecordNumericAmount } from '../utils/filterRecords';
+import type { VehicleFlagHistoryItem } from '../services/dataFabric';
+import { isRecordAnalyzed, getRecordNumericAmount } from '../utils/filterRecords';
 import { healthGradeClass } from '../utils/healthScore';
 import { pickField, recordId, type DpdRecord } from '../utils/record';
 
@@ -13,6 +14,7 @@ interface Props {
   companies: Array<CompanyCatalogItem & { totalCost?: number; healthGrade?: string }>;
   fleetStats: FleetCostStats;
   tableColumns: TableColumn[];
+  flagsByCostId?: Map<string, VehicleFlagHistoryItem>;
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
@@ -26,13 +28,14 @@ export function InsightsSection({
   companies,
   fleetStats,
   tableColumns,
+  flagsByCostId,
   loading,
   error,
   onRefresh,
   onOpenClaim,
   onOpenVehicle,
 }: Props) {
-  const flagged = costs.filter((r) => isLikelyFlagged(r, tableColumns));
+  const flagged = costs.filter((r) => isRecordAnalyzed(r, flagsByCostId));
   const topVehicles = [...vehicles]
     .filter((v) => (v.totalCost ?? 0) > 0)
     .sort((a, b) => (b.totalCost ?? 0) - (a.totalCost ?? 0))

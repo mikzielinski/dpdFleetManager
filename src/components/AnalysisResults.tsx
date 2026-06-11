@@ -4,10 +4,24 @@ import { riskBg, riskColor } from '../utils/record';
 interface Props {
   results: AnalysisVariables | null;
   title?: string;
+  /** Shown when there is no persisted/session AI result yet (e.g. Flagged without VehicleFlags row). */
+  pendingHint?: string | null;
 }
 
-export function AnalysisResults({ results, title = 'Wynik analizy AI' }: Props) {
-  if (!results) return null;
+export function AnalysisResults({
+  results,
+  title = 'Wynik analizy AI',
+  pendingHint,
+}: Props) {
+  if (!results) {
+    if (!pendingHint) return null;
+    return (
+      <section className="analysis-panel analysis-panel-pending">
+        <h3 className="section-title">{title}</h3>
+        <p className="hint-small">{pendingHint}</p>
+      </section>
+    );
+  }
   const rl = results.riskLevel;
 
   return (
