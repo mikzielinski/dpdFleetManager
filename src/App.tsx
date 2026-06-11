@@ -1012,12 +1012,20 @@ export default function App() {
     }
   }, [polledVars, activeRun, activeId, selectRecord]);
 
+  const recordWithFlagData = useMemo(() => {
+    if (!activeRecord) return null;
+    return enrichRecordForDetailView(activeRecord, {
+      vehicleFlag: activeVehicleFlag,
+      fileFields: ctx?.fileFields ?? [],
+    });
+  }, [activeRecord, activeVehicleFlag, ctx?.fileFields]);
+
   const activeResults = useMemo(() => {
     if (!activeId) return null;
     const fromSession = storedResults[activeId];
     if (fromSession) return fromSession;
-    return analysisVariablesFromRecord(activeRecord, activeVehicleFlag, activeId);
-  }, [activeId, storedResults, activeRecord, activeVehicleFlag]);
+    return analysisVariablesFromRecord(recordWithFlagData, activeVehicleFlag, activeId);
+  }, [activeId, storedResults, recordWithFlagData, activeVehicleFlag]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {

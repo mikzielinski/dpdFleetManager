@@ -64,7 +64,10 @@ export function analysisVariablesFromRecord(
 
   const flagType = pickNonEmpty(r, 'flagType') ?? fromFlag('flagType');
 
-  const validationStatus = pickNonEmpty(r, 'validationStatus', 'comments');
+  const requiresAction = fromFlag('requiresAction');
+  const validationStatus =
+    pickNonEmpty(r, 'validationStatus', 'comments') ??
+    (requiresAction && requiresAction.length <= 80 ? requiresAction : undefined);
   const decision = resolveAutoDecision(r);
   const vehicleReg = pickNonEmpty(r, 'carRegistration');
   const declaredAmount = formatDeclaredAmount(pickNonEmpty(r, 'netPrice', 'amount'));

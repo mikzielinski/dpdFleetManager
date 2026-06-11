@@ -1,6 +1,6 @@
 {
   "name": "dpd-fleet-manager",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "private": true,
   "description": "DPD Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro DPDDataInvestigator",
   "type": "module",
