@@ -158,7 +158,8 @@ export function GlobalFilterBar({
         </p>
       ) : section === 'insights' ? (
         <p className="filter-hint">
-          Analizy: oznaczenia, rankingi pojazdów i firm, pojazdy wymagające uwagi. Kliknij wiersz,
+          Analizy: przeanalizowane rozliczenia, rankingi pojazdów i firm, pojazdy wymagające uwagi.
+          Kliknij wiersz,
           aby przejść do szczegółów.
         </p>
       ) : section === 'claims' ? (
@@ -226,7 +227,7 @@ export function GlobalFilterBar({
               checked={filters.flaggedOnly}
               onChange={(e) => patch({ flaggedOnly: e.target.checked })}
             />
-            <span>Tylko z oznaczeniem / anomalią</span>
+            <span>Tylko przeanalizowane</span>
           </label>
         </div>
       ) : section === 'vehicles' ? (

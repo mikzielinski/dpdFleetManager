@@ -65,7 +65,7 @@ export function DashboardSection({
           <span className="overview-kpi-value">{companyCount}</span>
         </div>
         <div className="overview-kpi-card overview-kpi-warn">
-          <span className="overview-kpi-label">Oznaczenia / anomalie</span>
+          <span className="overview-kpi-label">Przeanalizowane</span>
           <span className="overview-kpi-value">{stats.flaggedCount}</span>
         </div>
       </div>

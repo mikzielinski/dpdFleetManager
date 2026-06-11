@@ -76,7 +76,7 @@ export function InsightsSection({
 
       <div className="insights-summary-row">
         <div className="insights-chip">
-          <span className="insights-chip-label">Oznaczone rozliczenia</span>
+          <span className="insights-chip-label">Przeanalizowane rozliczenia</span>
           <strong>{flagged.length}</strong>
         </div>
         <div className="insights-chip">
@@ -91,9 +91,9 @@ export function InsightsSection({
 
       <div className="insights-grid">
         <div className="insights-block">
-          <h3 className="section-title">Oznaczenia i anomalie</h3>
+          <h3 className="section-title">Przeanalizowane rozliczenia</h3>
           {flagged.length === 0 ? (
-            <p className="hint-small">Brak oznaczonych rozliczeń w bieżących danych.</p>
+            <p className="hint-small">Brak przeanalizowanych rozliczeń w bieżących danych.</p>
           ) : (
             <div className="table-wrap table-wrap-nested">
               <table>
