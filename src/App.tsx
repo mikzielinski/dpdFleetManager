@@ -97,6 +97,7 @@ import {
   type DpdRecord,
 } from './utils/record';
 import { DEFAULT_VEHICLE_FILTERS, type VehicleFilterState } from './utils/vehicleFilters';
+import { analysisVariablesFromRecord } from './utils/analysisFromRecord';
 import {
   enrichRecordForDetailView,
   pickDetailField,
@@ -1013,8 +1014,10 @@ export default function App() {
 
   const activeResults = useMemo(() => {
     if (!activeId) return null;
-    return storedResults[activeId] ?? null;
-  }, [activeId, storedResults]);
+    const fromSession = storedResults[activeId];
+    if (fromSession) return fromSession;
+    return analysisVariablesFromRecord(activeRecord, activeVehicleFlag, activeId);
+  }, [activeId, storedResults, activeRecord, activeVehicleFlag]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {
