@@ -1,5 +1,6 @@
 import type { TableColumn } from '../config';
-import { isLikelyFlagged, getRecordNumericAmount } from '../utils/filterRecords';
+import type { VehicleFlagHistoryItem } from './dataFabric';
+import { isRecordAnalyzed, getRecordNumericAmount } from '../utils/filterRecords';
 import { categorizeService, type ServiceCategory } from '../utils/serviceCategories';
 import type { DpdRecord } from '../utils/record';
 import { pickField, normalizeRegistration } from '../utils/record';
@@ -36,7 +37,8 @@ export interface FleetCostStats {
 
 function aggregateCosts(
   costs: DpdRecord[],
-  tableColumns?: TableColumn[],
+  _tableColumns?: TableColumn[],
+  flagsByCostId?: Map<string, VehicleFlagHistoryItem>,
 ): FleetCostStats {
   const catMap = new Map<ServiceCategory, { count: number; total: number }>();
   const svcMap = new Map<string, ServiceBreakdown>();
@@ -47,7 +49,7 @@ function aggregateCosts(
   for (const r of costs) {
     const amount = getRecordNumericAmount(r) ?? 0;
     totalCost += amount;
-    if (isLikelyFlagged(r, tableColumns)) flaggedCount += 1;
+    if (isRecordAnalyzed(r, flagsByCostId)) flaggedCount += 1;
 
     const svc = pickField(r, 'serviceName', 'ServiceName');
     const st = pickField(r, 'serviceType', 'ServiceType');
@@ -132,8 +134,12 @@ export function fleetMedianCostPerClaim(allPoc: DpdRecord[]): number {
   return amounts.length % 2 ? amounts[mid]! : (amounts[mid - 1]! + amounts[mid]!) / 2;
 }
 
-export function statsForFleet(allPoc: DpdRecord[], tableColumns?: TableColumn[]): FleetCostStats {
-  return aggregateCosts(allPoc, tableColumns);
+export function statsForFleet(
+  allPoc: DpdRecord[],
+  tableColumns?: TableColumn[],
+  flagsByCostId?: Map<string, VehicleFlagHistoryItem>,
+): FleetCostStats {
+  return aggregateCosts(allPoc, tableColumns, flagsByCostId);
 }
 
 /** Koszty przypisane do rejestracji (dla tabeli pojazdów). */

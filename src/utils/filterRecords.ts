@@ -1,5 +1,5 @@
 import type { TableColumn } from '../config';
-import { displayField } from '../services/dataFabric';
+import { displayField, type VehicleFlagHistoryItem } from '../services/dataFabric';
 import type { DpdRecord } from './record';
 import { pickField, recordId } from './record';
 
@@ -31,6 +31,18 @@ function parseNumLoose(s: string): number | null {
 /** Parsed numeric net amount for filtering and summaries (never Amount/ilość). */
 export function getRecordNumericAmount(r: DpdRecord): number | null {
   return parseNumLoose(pickField(r, 'netPrice'));
+}
+
+/** True when record has persisted AI analysis (VehicleFlags link or AI fields on POC). */
+export function isRecordAnalyzed(
+  r: DpdRecord,
+  flagsByCostId?: Map<string, VehicleFlagHistoryItem>,
+): boolean {
+  const id = recordId(r).toLowerCase();
+  if (id && flagsByCostId?.has(id)) return true;
+  if (pickField(r, 'fleetManagerNote') !== '—') return true;
+  if (pickField(r, 'combinedScore') !== '—') return true;
+  return false;
 }
 
 /** True when record is flagged / anomaly (Status, flag fields, or anomaly reason). */
@@ -77,11 +89,12 @@ export function filterClaimRecords(
   items: DpdRecord[],
   tableColumns: TableColumn[],
   filters: ClaimsFilterState,
+  flagsByCostId?: Map<string, VehicleFlagHistoryItem>,
 ): DpdRecord[] {
   const q = filters.query.trim().toLowerCase();
 
   return items.filter((r) => {
-    if (filters.flaggedOnly && !isLikelyFlagged(r, tableColumns)) return false;
+    if (filters.flaggedOnly && !isRecordAnalyzed(r, flagsByCostId)) return false;
 
     if (filters.serviceName) {
       const svcCol = tableColumns.find((c) => c.key === 'serviceName');

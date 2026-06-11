@@ -1,7 +1,7 @@
 # Deploy DPD Fleet Manager to dpdmonitoring (Coded Web App)
 # Usage: .\.uipath\deploy-dpdmonitoring.ps1 [version] [-Environment staging|production]
 param(
-  [string]$Version = "1.1.0",
+  [string]$Version = "",
   [ValidateSet('staging', 'production')]
   [string]$Environment = 'staging'
 )
@@ -15,6 +15,10 @@ if (-not (Test-Path $configPath)) {
   throw "Missing $configPath — copy deploy-config.production.example.json for production"
 }
 $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+if (-not $Version) {
+  $pkg = Get-Content (Join-Path $Root "package.json") -Raw | ConvertFrom-Json
+  $Version = $pkg.version
+}
 Write-Host "==> Environment: $($cfg.environment) ($configPath)" -ForegroundColor Cyan
 
 Write-Host "==> Build" -ForegroundColor Cyan
@@ -186,3 +190,6 @@ if ($html -match 'index-([A-Za-z0-9_-]+)\.js') {
 Write-Host "==> Push source to Studio (optional sync)" -ForegroundColor Cyan
 $env:UIPATH_PROJECT_ID = $cfg.studioProjectId
 uip codedapp push $cfg.studioProjectId --build-dir dist
+
+Write-Host "==> Clean old artifacts" -ForegroundColor Cyan
+node scripts/clean-artifacts.mjs --keep-latest
