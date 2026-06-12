@@ -10,10 +10,10 @@ import {
   RegionDualChart,
   RoleTags,
   SettlementBlock,
+  FuelByRegionChart,
   TopVehiclesCostChart,
   VehicleHealthScorePanel,
 } from './InsightsCharts';
-import { GroupedFuelByRegion } from '../DashboardCharts';
 
 interface Props {
   data: InsightsData | null;
@@ -164,7 +164,7 @@ export function InsightsSection({ data, loading, period, filters, onFiltersChang
           />
           <VehicleHealthScorePanel rows={data.distribution.topVehicles} />
           {data.dashboardBase.fuelRegions.length > 0 && (
-            <GroupedFuelByRegion rows={data.dashboardBase.fuelRegions} />
+            <FuelByRegionChart rows={data.dashboardBase.fuelRegions} />
           )}
           <SettlementBlock
             items={data.distribution.settlementStatus}

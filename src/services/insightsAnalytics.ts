@@ -293,7 +293,7 @@ function companiesWithAvgClaim(
 function vehiclesWithHealth(
   poc: DpdRecord[],
   vehicles: VehicleCatalogItem[],
-  limit = 10,
+  limit = 50,
 ): VehicleInsightRow[] {
   const cost = new Map<string, { total: number; count: number }>();
   for (const r of poc) {

@@ -291,16 +291,20 @@ export function DashboardKpiRow({
 export function CategoryShareBars({
   title,
   items,
+  embedded = false,
+  wide = true,
 }: {
   title: string;
   items: CategoryBreakdown[];
+  embedded?: boolean;
+  wide?: boolean;
 }) {
   if (!items.length) return null;
   const total = items.reduce((s, c) => s + c.total, 0) || 1;
   const max = Math.max(...items.map((c) => c.total), 1);
 
-  return (
-    <div className="dash-chart-card dash-chart-wide">
+  const body = (
+    <>
       <h4 className="dash-chart-title">{title}</h4>
       <ul className="dash-labeled-bars">
         {items.map((c) => {
@@ -327,7 +331,12 @@ export function CategoryShareBars({
           );
         })}
       </ul>
-    </div>
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className={wide ? 'dash-chart-card dash-chart-wide' : 'dash-chart-card'}>{body}</div>
   );
 }
 
@@ -377,15 +386,17 @@ export function RankBarChartToned({
 export function StackedStatusBar({
   title,
   items,
+  embedded = false,
 }: {
   title: string;
   items: { label: string; count: number }[];
+  embedded?: boolean;
 }) {
   const total = items.reduce((s, x) => s + x.count, 0);
   if (total <= 0) return null;
 
-  return (
-    <div className="dash-chart-card">
+  const body = (
+    <>
       <h4 className="dash-chart-title">{title}</h4>
       <div
         className="dash-stacked-bar"
@@ -416,8 +427,11 @@ export function StackedStatusBar({
           </li>
         ))}
       </ul>
-    </div>
+    </>
   );
+
+  if (embedded) return body;
+  return <div className="dash-chart-card">{body}</div>;
 }
 
 export function HealthGaugePanel({
@@ -583,7 +597,13 @@ function FuelRegionRows({ rows, maxCost, maxCount }: { rows: RegionFuelRow[]; ma
   );
 }
 
-export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
+export function GroupedFuelByRegion({
+  rows,
+  embedded = false,
+}: {
+  rows: RegionFuelRow[];
+  embedded?: boolean;
+}) {
   if (!rows.length) return null;
 
   const assigned = rows.filter((r) => !isUnassignedLabel(r.region));
@@ -594,8 +614,8 @@ export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
   const maxCostAll = Math.max(...rows.map((r) => r.fuelCost), 1);
   const maxCountAll = Math.max(...rows.map((r) => r.fuelCount), 1);
 
-  return (
-    <div className="dash-chart-card dash-chart-wide">
+  const body = (
+    <>
       <h4 className="dash-chart-title">Paliwo wg regionu</h4>
       <p className="dash-chart-desc">
         Ranking poziomy: tankowania, suma PLN i PLN na pojazd. Skala osobno dla regionów przypisanych
@@ -612,8 +632,11 @@ export function GroupedFuelByRegion({ rows }: { rows: RegionFuelRow[] }) {
           </ul>
         </>
       )}
-    </div>
+    </>
   );
+
+  if (embedded) return body;
+  return <div className="dash-chart-card dash-chart-wide">{body}</div>;
 }
 
 export function healthSegments(
