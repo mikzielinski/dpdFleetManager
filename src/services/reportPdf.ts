@@ -7,6 +7,7 @@ import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 import type { VehicleCatalogItem } from './vehicleCatalog';
 import type { CompanyCatalogItem } from './companyCatalog';
 import { BRAND, BRAND_RGB } from '../brand';
+import { applyPdfFonts, pdfTableFontStyles, pdfTableHeadStyles, PDF_FONT_FAMILY } from './pdfFonts';
 
 const REPORT = {
   costsTotal: 'Suma kosztów rozliczeń',
@@ -16,21 +17,22 @@ const REPORT = {
 } as const;
 
 function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
+  applyPdfFonts(doc);
   doc.setFillColor(...BRAND_RGB.indigo);
   doc.rect(0, 0, 210, 28, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT_FAMILY, 'bold');
   doc.text(BRAND.name, 14, 14);
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT_FAMILY, 'normal');
   doc.text(BRAND.productTitle, 14, 21);
   doc.setTextColor(...BRAND_RGB.dark);
   doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT_FAMILY, 'bold');
   doc.text(title, 14, 38);
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT_FAMILY, 'normal');
   doc.setTextColor(...BRAND_RGB.gray);
   doc.text(subtitle, 14, 45);
   doc.text(`Wygenerowano: ${new Date().toLocaleString('pl-PL')}`, 14, 51);
@@ -41,7 +43,7 @@ function addBrandFooter(doc: jsPDF) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT_FAMILY, 'normal');
     doc.setTextColor(...BRAND_RGB.gray);
     doc.text(
       `${BRAND.name} · ${BRAND.productTitle} · strona ${i}/${pageCount}`,
@@ -73,7 +75,7 @@ export function downloadVehicleReportPdf(opts: {
   let y = 58;
   doc.setTextColor(...BRAND_RGB.dark);
   doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT_FAMILY, 'bold');
   doc.text(`Health Score: ${health.score}/100 (${health.grade})`, 14, y);
   y += 6;
   doc.setFont('helvetica', 'normal');
@@ -94,8 +96,8 @@ export function downloadVehicleReportPdf(opts: {
       ['Status badania', compliance.inspectionStatus],
     ],
     theme: 'grid',
-    headStyles: { fillColor: BRAND_RGB.indigo, textColor: [255, 255, 255] },
-    styles: { fontSize: 9 },
+    headStyles: pdfTableHeadStyles(BRAND_RGB.indigo),
+    styles: { ...pdfTableFontStyles(), fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
 
@@ -103,7 +105,7 @@ export function downloadVehicleReportPdf(opts: {
   y += 8;
 
   if (stats.byCategory.length) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT_FAMILY, 'bold');
     doc.setFontSize(10);
     doc.text('Koszty wg kategorii usług', 14, y);
     y += 4;
@@ -116,8 +118,8 @@ export function downloadVehicleReportPdf(opts: {
         c.total.toFixed(2),
       ]),
       theme: 'striped',
-      headStyles: { fillColor: BRAND_RGB.navy },
-      styles: { fontSize: 8 },
+      headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+      styles: { ...pdfTableFontStyles(), fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
@@ -125,15 +127,15 @@ export function downloadVehicleReportPdf(opts: {
   }
 
   if (compliance.policies.length) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT_FAMILY, 'bold');
     doc.text('Polisy ubezpieczeniowe', 14, y);
     y += 4;
     autoTable(doc, {
       startY: y,
       head: [['Typ', 'Ważna do', 'Status']],
       body: compliance.policies.map((p) => [p.type, p.validUntil ?? '—', p.status]),
-      headStyles: { fillColor: BRAND_RGB.navy },
-      styles: { fontSize: 8 },
+      headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+      styles: { ...pdfTableFontStyles(), fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 20;
@@ -141,15 +143,15 @@ export function downloadVehicleReportPdf(opts: {
   }
 
   if (health.factors.length) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT_FAMILY, 'bold');
     doc.text('Czynniki Health Score', 14, y);
     y += 4;
     autoTable(doc, {
       startY: y,
       head: [['Czynnik', 'Wpływ', 'Szczegóły']],
       body: health.factors.map((f) => [f.label, String(f.impact), f.detail]),
-      headStyles: { fillColor: BRAND_RGB.navy },
-      styles: { fontSize: 8 },
+      headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+      styles: { ...pdfTableFontStyles(), fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
   }
@@ -179,7 +181,7 @@ export function downloadCompanyReportPdf(opts: {
   );
 
   let y = 58;
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT_FAMILY, 'bold');
   doc.setFontSize(11);
   doc.text(`Health Score: ${health.score}/100 (${health.grade})`, 14, y);
   y += 12;
@@ -194,8 +196,8 @@ export function downloadCompanyReportPdf(opts: {
       [REPORT.claimsCount, String(stats.claimCount)],
       [REPORT.analyzedCount, String(stats.flaggedCount)],
     ],
-    headStyles: { fillColor: BRAND_RGB.indigo, textColor: [255, 255, 255] },
-    styles: { fontSize: 9 },
+    headStyles: pdfTableHeadStyles(BRAND_RGB.indigo),
+    styles: { ...pdfTableFontStyles(), fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
 
@@ -207,8 +209,8 @@ export function downloadCompanyReportPdf(opts: {
       startY: y,
       head: [['Kategoria', 'Liczba', 'Suma PLN']],
       body: stats.byCategory.map((c) => [c.category, String(c.count), c.total.toFixed(2)]),
-      headStyles: { fillColor: BRAND_RGB.navy },
-      styles: { fontSize: 8 },
+      headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+      styles: { ...pdfTableFontStyles(), fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
@@ -216,7 +218,7 @@ export function downloadCompanyReportPdf(opts: {
   }
 
   if (vehicles.length) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT_FAMILY, 'bold');
     doc.setFontSize(10);
     doc.text('Pojazdy', 14, y);
     y += 4;
@@ -229,8 +231,8 @@ export function downloadCompanyReportPdf(opts: {
         v.healthGrade ? `${v.healthScore ?? '—'} (${v.healthGrade})` : '—',
         v.totalCost != null ? v.totalCost.toFixed(2) : '—',
       ]),
-      headStyles: { fillColor: BRAND_RGB.navy },
-      styles: { fontSize: 8 },
+      headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+      styles: { ...pdfTableFontStyles(), fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
   }
@@ -256,8 +258,8 @@ export function downloadFleetSummaryPdf(opts: {
       [REPORT.costsTotal, `${opts.stats.totalCost.toFixed(2)} PLN`],
       [REPORT.analyzedCount, String(opts.stats.flaggedCount)],
     ],
-    headStyles: { fillColor: BRAND_RGB.indigo, textColor: [255, 255, 255] },
-    styles: { fontSize: 9 },
+    headStyles: pdfTableHeadStyles(BRAND_RGB.indigo),
+    styles: { ...pdfTableFontStyles(), fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
 
@@ -269,8 +271,8 @@ export function downloadFleetSummaryPdf(opts: {
       const meta = SERVICE_CATEGORIES.find((x) => x.id === c.category);
       return [meta?.label ?? c.category, String(c.count), c.total.toFixed(2)];
     }),
-    headStyles: { fillColor: BRAND_RGB.navy },
-    styles: { fontSize: 8 },
+    headStyles: pdfTableHeadStyles(BRAND_RGB.navy),
+    styles: { ...pdfTableFontStyles(), fontSize: 8 },
     margin: { left: 14, right: 14 },
   });
 
