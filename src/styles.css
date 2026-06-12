@@ -104,6 +104,85 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
+.case-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.case-status-approved {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.case-status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.case-status-flagged {
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
+}
+
+.case-status-fraud {
+  background: #450a0a;
+  color: #fecaca;
+  border: 2px solid #ef4444;
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35);
+}
+
+.case-status-fraud-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #ef4444;
+  color: #fff;
+}
+
+.case-status-pending,
+.case-status-neutral {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.sortable-data-table tbody tr.case-row-approved {
+  background: rgba(22, 163, 74, 0.04);
+}
+
+.sortable-data-table tbody tr.case-row-rejected {
+  background: rgba(220, 38, 38, 0.04);
+}
+
+.sortable-data-table tbody tr.case-row-flagged {
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.sortable-data-table tbody tr.case-row-fraud {
+  background: rgba(127, 29, 29, 0.06);
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.sortable-data-table tbody tr.row-active.case-row-approved,
+.sortable-data-table tbody tr.row-active.case-row-rejected,
+.sortable-data-table tbody tr.row-active.case-row-flagged,
+.sortable-data-table tbody tr.row-active.case-row-fraud {
+  background: rgba(44, 39, 96, 0.1);
+}
+
 .progress-banner,
 .info-banner {
   padding: 10px 20px;

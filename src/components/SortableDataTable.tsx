@@ -27,6 +27,7 @@ interface Props<T> {
   columnFilters: ColumnFilters;
   onColumnFiltersChange: (filters: ColumnFilters) => void;
   onRowClick?: (row: T) => void;
+  rowClassName?: (row: T) => string | undefined;
   activeRowKey?: string | null;
   loading?: boolean;
   loadingMessage?: string;
@@ -44,6 +45,7 @@ export function SortableDataTable<T>({
   columnFilters,
   onColumnFiltersChange,
   onRowClick,
+  rowClassName,
   activeRowKey,
   loading = false,
   loadingMessage = 'Ładowanie…',
@@ -128,10 +130,17 @@ export function SortableDataTable<T>({
           rows.map((row) => {
             const key = rowKey(row);
             const active = activeRowKey != null && activeRowKey === key;
+            const extraClass = rowClassName?.(row);
+            const trClass = [
+              active ? 'row-active' : onRowClick ? 'row-clickable' : '',
+              extraClass ?? '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
               <tr
                 key={key}
-                className={active ? 'row-active' : onRowClick ? 'row-clickable' : undefined}
+                className={trClass || undefined}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {renderLeadingCell ? (

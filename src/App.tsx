@@ -29,6 +29,7 @@ import {
   type EntityContext,
   type VehicleFlagHistoryItem,
 } from './services/dataFabric';
+import { CaseStatusBadge } from './components/CaseStatusBadge';
 import { BrandLogo } from './components/BrandLogo';
 import { BRAND } from './brand';
 import { CompaniesSection } from './components/CompaniesSection';
@@ -45,6 +46,7 @@ import {
   needsFullDatasetFilters,
   type ClaimsFilterState,
 } from './utils/filterRecords';
+import { getCaseStatusFromRecord } from './utils/caseStatus';
 import {
   findLatestInstance,
   isTerminalStatus,
@@ -231,7 +233,12 @@ export default function App() {
       key: col.key,
       label: col.label,
       align: numericKeys.has(col.key) ? ('right' as const) : ('left' as const),
-      render: (r) => displayField(r, col),
+      render: (r) =>
+        col.key === 'decision' ? (
+          <CaseStatusBadge record={r} tableColumns={tableColumns} />
+        ) : (
+          displayField(r, col)
+        ),
       sortValue: (r) => {
         const text = displayField(r, col);
         if (numericKeys.has(col.key)) {
@@ -1251,6 +1258,11 @@ export default function App() {
   );
 
   const renderDetailFieldValue = (key: string) => {
+    if (key === 'decision') {
+      const record = detailRecord ?? activeRecord;
+      if (!record) return '—';
+      return <CaseStatusBadge record={record} tableColumns={tableColumns} />;
+    }
     if (key === 'invoiceFileName') {
       if (invoiceLoading) return <span className="hint-small">Pobieranie załącznika…</span>;
       if (invoiceDownloadUrl) {
@@ -1498,6 +1510,7 @@ export default function App() {
                   columnFilters={claimsColumnFilters}
                   onColumnFiltersChange={setClaimsColumnFilters}
                   onRowClick={onRowClick}
+                  rowClassName={(r) => getCaseStatusFromRecord(r, tableColumns).rowClass}
                   activeRowKey={activeId}
                   loading={loadingTable}
                   loadingMessage={
@@ -1823,7 +1836,9 @@ export default function App() {
                               >
                                 <td>{pickField(r, 'serviceName')}</td>
                                 <td className="col-numeric">{pickField(r, 'netPrice')}</td>
-                                <td>{pickField(r, 'decision')}</td>
+                                <td>
+                                  <CaseStatusBadge record={r} tableColumns={tableColumns} />
+                                </td>
                               </tr>
                             );
                           })

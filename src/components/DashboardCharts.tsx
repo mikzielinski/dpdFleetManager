@@ -6,6 +6,7 @@ import type { HealthBucket } from '../services/dashboardAnalytics';
 import { barToneForValue, type BarTone } from '../utils/dashboardBarTone';
 import { isUnassignedLabel } from '../utils/dashboardFilters';
 import { BRAND } from '../brand';
+import { decisionChartColor } from '../utils/caseStatus';
 import { SERVICE_CATEGORIES, type ServiceCategory } from '../utils/serviceCategories';
 
 export interface ChartSegment {
@@ -222,11 +223,7 @@ function toneClass(tone: BarTone): string {
 }
 
 function decisionColor(label: string): string {
-  const l = label.toLowerCase();
-  if (/zatwier|approv/i.test(l)) return '#2a9d8f';
-  if (/flag|anomal/i.test(l)) return BRAND.indigo;
-  if (/oczek|pend/i.test(l)) return '#e9c46a';
-  return '#9ca3af';
+  return decisionChartColor(label);
 }
 
 export function DashboardKpiRow({
