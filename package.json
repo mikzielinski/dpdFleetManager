@@ -1,6 +1,6 @@
 {
   "name": "dpd-fleet-manager",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "private": true,
   "description": "Xelto Express Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro",
   "type": "module",

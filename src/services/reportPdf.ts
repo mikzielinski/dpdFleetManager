@@ -16,8 +16,8 @@ const REPORT = {
   fleetRegistry: 'Rejestr rozliczeń kosztów floty',
 } as const;
 
-function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
-  applyPdfFonts(doc);
+async function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
+  await applyPdfFonts(doc);
   doc.setFillColor(...BRAND_RGB.indigo);
   doc.rect(0, 0, 210, 28, 'F');
   doc.setTextColor(255, 255, 255);
@@ -58,7 +58,7 @@ function saveDoc(doc: jsPDF, filename: string) {
   doc.save(filename);
 }
 
-export function downloadVehicleReportPdf(opts: {
+export async function downloadVehicleReportPdf(opts: {
   vehicle: VehicleCatalogItem;
   stats: FleetCostStats;
   health: HealthScoreResult;
@@ -66,7 +66,7 @@ export function downloadVehicleReportPdf(opts: {
 }) {
   const { vehicle, stats, health, compliance } = opts;
   const doc = new jsPDF();
-  addBrandHeader(
+  await addBrandHeader(
     doc,
     `Raport pojazdu ${vehicle.registration}`,
     `${vehicle.companyLabel || '—'} · ${vehicle.areaLabel || '—'}`,
@@ -166,7 +166,7 @@ export function downloadVehicleReportPdf(opts: {
   saveDoc(doc, `Xelto_Pojazd_${vehicle.registration.replace(/\s/g, '_')}.pdf`);
 }
 
-export function downloadCompanyReportPdf(opts: {
+export async function downloadCompanyReportPdf(opts: {
   company: CompanyCatalogItem;
   stats: FleetCostStats;
   health: HealthScoreResult;
@@ -174,7 +174,7 @@ export function downloadCompanyReportPdf(opts: {
 }) {
   const { company, stats, health, vehicles } = opts;
   const doc = new jsPDF();
-  addBrandHeader(
+  await addBrandHeader(
     doc,
     `Raport firmy B2B`,
     company.name,
@@ -240,13 +240,13 @@ export function downloadCompanyReportPdf(opts: {
   saveDoc(doc, `Xelto_Firma_${company.name.slice(0, 30).replace(/[^\w]/g, '_')}.pdf`);
 }
 
-export function downloadFleetSummaryPdf(opts: {
+export async function downloadFleetSummaryPdf(opts: {
   stats: FleetCostStats;
   vehicleCount: number;
   companyCount: number;
 }) {
   const doc = new jsPDF();
-  addBrandHeader(doc, 'Podsumowanie floty', REPORT.fleetRegistry);
+  await addBrandHeader(doc, 'Podsumowanie floty', REPORT.fleetRegistry);
 
   autoTable(doc, {
     startY: 58,

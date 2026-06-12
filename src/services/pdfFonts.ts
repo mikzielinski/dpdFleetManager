@@ -1,10 +1,19 @@
 import type { jsPDF } from 'jspdf';
-import { PDF_FONT_ENTRIES } from './pdfFonts.generated';
 
 export const PDF_FONT_FAMILY = 'Roboto';
 
-/** Register Roboto (latin-ext) for Polish diacritics in jsPDF / autoTable. */
-export function applyPdfFonts(doc: jsPDF): void {
+let fontModulePromise: Promise<typeof import('./pdfFonts.generated')> | null = null;
+
+function loadFontModule() {
+  if (!fontModulePromise) {
+    fontModulePromise = import('./pdfFonts.generated');
+  }
+  return fontModulePromise;
+}
+
+/** Register full Roboto for Polish + ASCII in jsPDF / autoTable (lazy-loaded chunk). */
+export async function applyPdfFonts(doc: jsPDF): Promise<void> {
+  const { PDF_FONT_ENTRIES } = await loadFontModule();
   for (const entry of PDF_FONT_ENTRIES) {
     doc.addFileToVFS(entry.vfs, entry.base64);
     doc.addFont(entry.vfs, entry.family, entry.style);
