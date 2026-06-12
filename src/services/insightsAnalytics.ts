@@ -286,14 +286,12 @@ function companiesWithAvgClaim(
       count: v.count,
       avgPerClaim: v.count > 0 ? v.total / v.count : 0,
     }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+    .sort((a, b) => b.total - a.total);
 }
 
 function vehiclesWithHealth(
   poc: DpdRecord[],
   vehicles: VehicleCatalogItem[],
-  limit = 50,
 ): VehicleInsightRow[] {
   const cost = new Map<string, { total: number; count: number }>();
   for (const r of poc) {
@@ -318,8 +316,7 @@ function vehiclesWithHealth(
         healthGrade: veh?.healthGrade ?? null,
       };
     })
-    .sort((a, b) => b.total - a.total)
-    .slice(0, limit);
+    .sort((a, b) => b.total - a.total);
 }
 
 function healthShareSnapshot(vehicles: VehicleCatalogItem[]): MonthHealthShare {

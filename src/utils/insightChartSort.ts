@@ -53,6 +53,33 @@ export function sortByNumeric<T>(
   return dir === 'desc' ? out.reverse() : out;
 }
 
+export type ChartLimitPreset = '5' | '10' | '20' | '50' | 'all' | 'custom';
+
+export const DEFAULT_CHART_LIMIT_PRESET: ChartLimitPreset = '10';
+export const DEFAULT_CHART_CUSTOM_LIMIT = 10;
+
+export function applyChartLimit<T>(
+  rows: T[],
+  preset: ChartLimitPreset,
+  customLimit: number,
+): T[] {
+  if (preset === 'all') return rows;
+  const n = preset === 'custom' ? customLimit : Number(preset);
+  if (!Number.isFinite(n) || n < 1) return rows.slice(0, DEFAULT_CHART_CUSTOM_LIMIT);
+  return rows.slice(0, Math.min(Math.floor(n), rows.length));
+}
+
+export function chartLimitCount(
+  preset: ChartLimitPreset,
+  customLimit: number,
+  available: number,
+): number {
+  if (preset === 'all') return available;
+  const n = preset === 'custom' ? customLimit : Number(preset);
+  if (!Number.isFinite(n) || n < 1) return Math.min(DEFAULT_CHART_CUSTOM_LIMIT, available);
+  return Math.min(Math.floor(n), available);
+}
+
 export const COMMON_SORTS = {
   valueDesc: { id: 'total-desc', label: 'Wartość malejąco' },
   valueAsc: { id: 'total-asc', label: 'Wartość rosnąco' },

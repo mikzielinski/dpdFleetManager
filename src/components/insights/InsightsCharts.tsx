@@ -11,12 +11,16 @@ import type {
 import type { RegionFuelRow } from '../../services/regionFuelAnalytics';
 import { SERVICE_CATEGORIES, type ServiceCategory } from '../../utils/serviceCategories';
 import {
+  applyChartLimit,
   COMMON_SORTS,
+  DEFAULT_CHART_CUSTOM_LIMIT,
+  DEFAULT_CHART_LIMIT_PRESET,
   filterByHealthGrade,
   sortByLabel,
   sortByMonth,
   sortByName,
   sortByNumeric,
+  type ChartLimitPreset,
   type HealthGradeFilter,
 } from '../../utils/insightChartSort';
 import { CategoryShareBars, GroupedFuelByRegion, StackedStatusBar, TopVehiclesWithAvg } from '../DashboardCharts';
@@ -395,13 +399,31 @@ export function CompaniesTable({
   rows: { name: string; total: number; count: number; avgPerClaim: number }[];
 }) {
   const [sort, setSort] = useState('total-desc');
+  const [limitPreset, setLimitPreset] = useState<ChartLimitPreset>(DEFAULT_CHART_LIMIT_PRESET);
+  const [customLimit, setCustomLimit] = useState(DEFAULT_CHART_CUSTOM_LIMIT);
   const sorted = useMemo(() => sortCompanies(rows, sort), [rows, sort]);
+  const displayed = useMemo(
+    () => applyChartLimit(sorted, limitPreset, customLimit),
+    [sorted, limitPreset, customLimit],
+  );
 
   if (!sorted.length) return null;
 
   return (
     <div className="dash-chart-card">
-      <ChartViewControls sortOptions={COMPANY_SORTS} sort={sort} onSortChange={setSort} />
+      <ChartViewControls
+        sortOptions={COMPANY_SORTS}
+        sort={sort}
+        onSortChange={setSort}
+        showLimitControl
+        limitPreset={limitPreset}
+        onLimitPresetChange={setLimitPreset}
+        customLimit={customLimit}
+        onCustomLimitChange={setCustomLimit}
+        displayedCount={displayed.length}
+        filteredCount={sorted.length}
+        totalCount={rows.length}
+      />
       <h4 className="dash-chart-title">Top firmy kurierskie</h4>
       <div className="table-wrap table-wrap-nested">
         <table className="fleet-table">
@@ -414,7 +436,7 @@ export function CompaniesTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => (
+            {displayed.map((r) => (
               <tr key={r.name}>
                 <td className="col-text-wrap">{r.name}</td>
                 <td className="col-numeric">{r.total.toLocaleString('pl-PL', { maximumFractionDigits: 0 })}</td>
@@ -440,10 +462,16 @@ export function TopVehiclesCostChart({
 }) {
   const [sort, setSort] = useState('total-desc');
   const [gradeFilter, setGradeFilter] = useState<HealthGradeFilter>('all');
+  const [limitPreset, setLimitPreset] = useState<ChartLimitPreset>(DEFAULT_CHART_LIMIT_PRESET);
+  const [customLimit, setCustomLimit] = useState(DEFAULT_CHART_CUSTOM_LIMIT);
 
   const filtered = useMemo(() => filterByHealthGrade(rows, gradeFilter), [rows, gradeFilter]);
   const sorted = useMemo(() => sortVehicles(filtered, sort), [filtered, sort]);
-  const rankRows = sorted.map((r) => ({ name: r.name, total: r.total, count: r.count }));
+  const displayed = useMemo(
+    () => applyChartLimit(sorted, limitPreset, customLimit),
+    [sorted, limitPreset, customLimit],
+  );
+  const rankRows = displayed.map((r) => ({ name: r.name, total: r.total, count: r.count }));
 
   if (!rows.length) return null;
 
@@ -456,7 +484,13 @@ export function TopVehiclesCostChart({
         gradeFilter={gradeFilter}
         onGradeFilterChange={setGradeFilter}
         showGradeFilter
-        resultCount={sorted.length}
+        showLimitControl
+        limitPreset={limitPreset}
+        onLimitPresetChange={setLimitPreset}
+        customLimit={customLimit}
+        onCustomLimitChange={setCustomLimit}
+        displayedCount={displayed.length}
+        filteredCount={sorted.length}
         totalCount={rows.length}
       />
       <TopVehiclesWithAvg rows={rankRows} fleetAverage={fleetAverage} embedded />
@@ -467,9 +501,15 @@ export function TopVehiclesCostChart({
 export function VehicleHealthScorePanel({ rows }: { rows: VehicleInsightRow[] }) {
   const [sort, setSort] = useState('score-desc');
   const [gradeFilter, setGradeFilter] = useState<HealthGradeFilter>('all');
+  const [limitPreset, setLimitPreset] = useState<ChartLimitPreset>(DEFAULT_CHART_LIMIT_PRESET);
+  const [customLimit, setCustomLimit] = useState(DEFAULT_CHART_CUSTOM_LIMIT);
 
   const filtered = useMemo(() => filterByHealthGrade(rows, gradeFilter), [rows, gradeFilter]);
   const sorted = useMemo(() => sortVehicles(filtered, sort), [filtered, sort]);
+  const displayed = useMemo(
+    () => applyChartLimit(sorted, limitPreset, customLimit),
+    [sorted, limitPreset, customLimit],
+  );
 
   if (!rows.length) return null;
 
@@ -482,7 +522,13 @@ export function VehicleHealthScorePanel({ rows }: { rows: VehicleInsightRow[] })
         gradeFilter={gradeFilter}
         onGradeFilterChange={setGradeFilter}
         showGradeFilter
-        resultCount={sorted.length}
+        showLimitControl
+        limitPreset={limitPreset}
+        onLimitPresetChange={setLimitPreset}
+        customLimit={customLimit}
+        onCustomLimitChange={setCustomLimit}
+        displayedCount={displayed.length}
+        filteredCount={sorted.length}
         totalCount={rows.length}
       />
       <h4 className="dash-chart-title">Health score pojazdów</h4>
@@ -491,7 +537,7 @@ export function VehicleHealthScorePanel({ rows }: { rows: VehicleInsightRow[] })
         <p className="insight-empty">Brak pojazdów dla wybranej oceny.</p>
       ) : (
         <ul className="insights-vehicle-health-compact">
-          {sorted.map((r) => (
+          {displayed.map((r) => (
             <li key={r.name}>
               <span className="insights-vehicle-health-plate">{r.name}</span>
               {r.healthGrade ? (

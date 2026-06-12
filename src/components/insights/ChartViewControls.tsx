@@ -1,4 +1,4 @@
-import type { HealthGradeFilter } from '../../utils/insightChartSort';
+import type { ChartLimitPreset, HealthGradeFilter } from '../../utils/insightChartSort';
 
 export interface ChartSortOption {
   id: string;
@@ -12,7 +12,13 @@ interface Props {
   gradeFilter?: HealthGradeFilter;
   onGradeFilterChange?: (grade: HealthGradeFilter) => void;
   showGradeFilter?: boolean;
-  resultCount?: number;
+  showLimitControl?: boolean;
+  limitPreset?: ChartLimitPreset;
+  onLimitPresetChange?: (preset: ChartLimitPreset) => void;
+  customLimit?: number;
+  onCustomLimitChange?: (n: number) => void;
+  displayedCount?: number;
+  filteredCount?: number;
   totalCount?: number;
 }
 
@@ -33,9 +39,20 @@ export function ChartViewControls({
   gradeFilter,
   onGradeFilterChange,
   showGradeFilter = false,
-  resultCount,
+  showLimitControl = false,
+  limitPreset,
+  onLimitPresetChange,
+  customLimit,
+  onCustomLimitChange,
+  displayedCount,
+  filteredCount,
   totalCount,
 }: Props) {
+  const showCountHint =
+    displayedCount != null &&
+    totalCount != null &&
+    (displayedCount !== totalCount || (filteredCount != null && filteredCount !== totalCount));
+
   return (
     <div className="insights-chart-controls">
       <label className="insights-chart-sort">
@@ -48,6 +65,44 @@ export function ChartViewControls({
           ))}
         </select>
       </label>
+
+      {showLimitControl &&
+      limitPreset != null &&
+      onLimitPresetChange &&
+      customLimit != null &&
+      onCustomLimitChange ? (
+        <div className="insights-limit-control">
+          <label className="insights-chart-sort">
+            <span className="insights-chart-sort-label">Pokaż</span>
+            <select
+              value={limitPreset}
+              onChange={(e) => onLimitPresetChange(e.target.value as ChartLimitPreset)}
+            >
+              <option value="5">Top 5</option>
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="50">Top 50</option>
+              <option value="all">Wszystko</option>
+              <option value="custom">Własna liczba</option>
+            </select>
+          </label>
+          {limitPreset === 'custom' ? (
+            <label className="insights-chart-sort insights-limit-custom">
+              <span className="insights-chart-sort-label">Liczba</span>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, filteredCount ?? totalCount ?? 999)}
+                value={customLimit}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  onCustomLimitChange(Number.isFinite(n) && n > 0 ? n : 1);
+                }}
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
 
       {showGradeFilter && gradeFilter != null && onGradeFilterChange ? (
         <div className="insights-grade-filters" role="group" aria-label="Filtr oceny health">
@@ -69,9 +124,21 @@ export function ChartViewControls({
         </div>
       ) : null}
 
-      {resultCount != null && totalCount != null && resultCount !== totalCount ? (
+      {showCountHint ? (
         <span className="insights-chart-count-hint">
-          Pokazano <strong>{resultCount}</strong> z {totalCount}
+          Pokazano <strong>{displayedCount}</strong>
+          {filteredCount != null && filteredCount !== totalCount ? (
+            <>
+              {' '}
+              z <strong>{filteredCount}</strong> po filtrze
+            </>
+          ) : null}
+          {totalCount != null ? (
+            <>
+              {' '}
+              (łącznie <strong>{totalCount}</strong>)
+            </>
+          ) : null}
         </span>
       ) : null}
     </div>
