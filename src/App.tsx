@@ -1618,19 +1618,6 @@ export default function App() {
                           </div>
                         ))}
                       </dl>
-
-                      {visibleLongFields.length > 0 ? (
-                        <div className="detail-long-fields">
-                          {visibleLongFields.map((key) => (
-                            <div key={key} className="detail-long-item">
-                              <h4 className="detail-long-label">
-                                {DETAIL_FIELD_LABELS[key] ?? key}
-                              </h4>
-                              <p className="detail-long-value">{renderDetailFieldValue(key)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
                     </div>
 
                     <aside className="detail-split-preview">
@@ -1643,6 +1630,19 @@ export default function App() {
                       />
                     </aside>
                   </div>
+
+                  {visibleLongFields.length > 0 ? (
+                    <div className="detail-long-fields detail-long-fields-full">
+                      {visibleLongFields.map((key) => (
+                        <div key={key} className="detail-long-item">
+                          <h4 className="detail-long-label">
+                            {DETAIL_FIELD_LABELS[key] ?? key}
+                          </h4>
+                          <p className="detail-long-value">{renderDetailFieldValue(key)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <VehicleCaseHistory
                     items={vehicleHistory}

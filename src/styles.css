@@ -609,6 +609,20 @@ tbody tr:hover {
   margin-top: 12px;
 }
 
+.detail-long-fields-full {
+  width: 100%;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+.detail-long-fields-full .detail-long-item {
+  width: 100%;
+}
+
+.detail-long-fields-full .detail-long-value {
+  max-width: none;
+}
+
 .detail-long-item {
   background: #fff;
   border: 1px solid #e0e0e0;
