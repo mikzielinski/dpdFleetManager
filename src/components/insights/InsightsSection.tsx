@@ -10,7 +10,8 @@ import {
   RegionDualChart,
   RoleTags,
   SettlementBlock,
-  VehiclesWithHealthChart,
+  TopVehiclesCostChart,
+  VehicleHealthScorePanel,
 } from './InsightsCharts';
 import { GroupedFuelByRegion } from '../DashboardCharts';
 
@@ -157,10 +158,11 @@ export function InsightsSection({ data, loading, period, filters, onFiltersChang
           <CategoryDistribution items={data.distribution.byCategory} />
           <RegionDualChart rows={data.distribution.regionsDual} />
           <CompaniesTable rows={data.distribution.topCompanies} />
-          <VehiclesWithHealthChart
+          <TopVehiclesCostChart
             rows={data.distribution.topVehicles}
             fleetAverage={data.dashboardBase.fleetAvgVehicleCost}
           />
+          <VehicleHealthScorePanel rows={data.distribution.topVehicles} />
           {data.dashboardBase.fuelRegions.length > 0 && (
             <GroupedFuelByRegion rows={data.dashboardBase.fuelRegions} />
           )}
