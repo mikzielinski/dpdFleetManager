@@ -33,7 +33,7 @@ import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
 import { DashboardSection } from './components/DashboardSection';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
-import { InsightsSection } from './components/InsightsSection';
+import { InsightsSection } from './components/insights/InsightsSection';
 import { SortableDataTable, type DataTableColumn } from './components/SortableDataTable';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
 import {
@@ -100,6 +100,23 @@ import {
   type DpdRecord,
 } from './utils/record';
 import { DEFAULT_VEHICLE_FILTERS, type VehicleFilterState } from './utils/vehicleFilters';
+import {
+  DEFAULT_PERIOD_FILTER,
+  filterRecordsByPeriod,
+  filterRecordsByPreviousPeriod,
+  isPeriodFilterActive,
+  type PeriodFilterState,
+} from './utils/periodFilter';
+import {
+  DEFAULT_DASHBOARD_FILTERS,
+  type DashboardFilterState,
+} from './utils/dashboardFilters';
+import {
+  buildDashboardData,
+  filterPocForDashboard,
+} from './services/dashboardAnalytics';
+import { buildInsightsData, pocForInsights } from './services/insightsAnalytics';
+import { aggregateFuelByRegion } from './services/regionFuelAnalytics';
 import {
   analysisVariablesFromRecord,
   mergeAnalysisVariables,
@@ -173,6 +190,9 @@ export default function App() {
   const [companyCatalogError, setCompanyCatalogError] = useState<string | null>(null);
   const [companyFilters, setCompanyFilters] = useState<CompanyFilterState>(DEFAULT_COMPANY_FILTERS);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const [dashboardFilters, setDashboardFilters] =
+    useState<DashboardFilterState>(DEFAULT_DASHBOARD_FILTERS);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterState>(DEFAULT_PERIOD_FILTER);
 
   const [claimsSort, setClaimsSort] = useState<TableSortState | null>(null);
   const [claimsColumnFilters, setClaimsColumnFilters] = useState<ColumnFilters>({});
@@ -183,17 +203,25 @@ export default function App() {
 
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
 
+  const periodFilterActive = isPeriodFilterActive(periodFilter);
+  const pocSourceForPeriod = allPocCosts.length > 0 ? allPocCosts : records;
+
+  const periodFilteredPoc = useMemo(
+    () => filterRecordsByPeriod(pocSourceForPeriod, periodFilter),
+    [pocSourceForPeriod, periodFilter],
+  );
+
   const globalFilterActive = useMemo(
-    () => needsFullDatasetFilters(claimFilters),
-    [claimFilters],
+    () => needsFullDatasetFilters(claimFilters) || periodFilterActive,
+    [claimFilters, periodFilterActive],
   );
 
   const flagsByCostId = vehicleFlagsIndex?.byCostRecordId;
 
-  const filteredRecords = useMemo(
-    () => filterClaimRecords(records, tableColumns, claimFilters, flagsByCostId),
-    [records, tableColumns, claimFilters, flagsByCostId],
-  );
+  const filteredRecords = useMemo(() => {
+    const scoped = filterRecordsByPeriod(records, periodFilter);
+    return filterClaimRecords(scoped, tableColumns, claimFilters, flagsByCostId);
+  }, [records, periodFilter, tableColumns, claimFilters, flagsByCostId]);
 
   const claimDataColumns = useMemo((): DataTableColumn<DpdRecord>[] => {
     const numericKeys = new Set(['netPrice', 'grossPrice', 'amount', 'totalPrice']);
@@ -595,22 +623,93 @@ export default function App() {
   }, [activeCompanyStats, fleetMedianCost]);
 
   const fleetStats = useMemo(
-    () => statsForFleet(allPocCosts, tableColumns, flagsByCostId),
-    [allPocCosts, tableColumns, flagsByCostId],
+    () => statsForFleet(periodFilteredPoc, tableColumns, flagsByCostId),
+    [periodFilteredPoc, tableColumns, flagsByCostId],
   );
 
-  const fleetHealth = useMemo(
-    () =>
-      computeHealthScore({
-        stats: fleetStats,
-        complianceIssueCount: enrichedVehicles.reduce(
-          (n, v) => n + (v.compliance?.complianceIssues.length ?? 0),
-          0,
-        ),
-        fleetMedianCostPerClaim: fleetMedianCost,
-      }),
-    [fleetStats, enrichedVehicles, fleetMedianCost],
+  const regionFuelRows = useMemo(() => {
+    if (!vehicleCatalog?.vehicles.length) return [];
+    return aggregateFuelByRegion(
+      periodFilteredPoc,
+      pocSourceForPeriod,
+      enrichedVehicles,
+      periodFilter,
+    );
+  }, [periodFilteredPoc, pocSourceForPeriod, enrichedVehicles, periodFilter, vehicleCatalog]);
+
+  const dashboardPoc = useMemo(
+    () => filterPocForDashboard(periodFilteredPoc, enrichedVehicles, dashboardFilters),
+    [periodFilteredPoc, enrichedVehicles, dashboardFilters],
   );
+
+  const dashboardPocPrevious = useMemo(() => {
+    const prev = filterRecordsByPreviousPeriod(pocSourceForPeriod, periodFilter);
+    return filterPocForDashboard(prev, enrichedVehicles, dashboardFilters);
+  }, [pocSourceForPeriod, periodFilter, enrichedVehicles, dashboardFilters]);
+
+  const insightsPoc = useMemo(
+    () => pocForInsights(periodFilteredPoc, enrichedVehicles, dashboardFilters),
+    [periodFilteredPoc, enrichedVehicles, dashboardFilters],
+  );
+
+  const insightsPocPrevious = useMemo(() => {
+    const prev = filterRecordsByPreviousPeriod(pocSourceForPeriod, periodFilter);
+    return pocForInsights(prev, enrichedVehicles, dashboardFilters);
+  }, [pocSourceForPeriod, periodFilter, enrichedVehicles, dashboardFilters]);
+
+  const dashboardRegionFuel = useMemo(() => {
+    const cat = dashboardFilters.category;
+    if (cat && cat !== 'Paliwo') return [];
+    const rows = !dashboardFilters.area
+      ? regionFuelRows
+      : regionFuelRows.filter((r) => r.region === dashboardFilters.area);
+    return rows;
+  }, [regionFuelRows, dashboardFilters.area, dashboardFilters.category]);
+
+  const dashboardData = useMemo(() => {
+    if (!periodFilteredPoc.length && !enrichedVehicles.length) return null;
+    return buildDashboardData(
+      dashboardPoc,
+      enrichedVehicles,
+      enrichedCompanies,
+      dashboardRegionFuel,
+      tableColumns,
+      dashboardFilters,
+      dashboardPocPrevious,
+    );
+  }, [
+    dashboardPoc,
+    dashboardPocPrevious,
+    enrichedVehicles,
+    enrichedCompanies,
+    dashboardRegionFuel,
+    tableColumns,
+    dashboardFilters,
+    periodFilteredPoc.length,
+  ]);
+
+  const insightsData = useMemo(() => {
+    if (!insightsPoc.length && !enrichedVehicles.length) return null;
+    return buildInsightsData(
+      insightsPoc,
+      insightsPocPrevious,
+      pocSourceForPeriod,
+      enrichedVehicles,
+      enrichedCompanies,
+      dashboardRegionFuel,
+      tableColumns,
+      dashboardFilters,
+    );
+  }, [
+    insightsPoc,
+    insightsPocPrevious,
+    pocSourceForPeriod,
+    enrichedVehicles,
+    enrichedCompanies,
+    dashboardRegionFuel,
+    tableColumns,
+    dashboardFilters,
+  ]);
 
   const activeVehicleCosts = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return [];
@@ -682,7 +781,30 @@ export default function App() {
 
   useEffect(() => {
     if (globalFilterActive) setPageIndex(0);
-  }, [claimFilters, globalFilterActive]);
+  }, [claimFilters, globalFilterActive, periodFilter]);
+
+  const ensurePocCostsLoaded = useCallback(async () => {
+    if (!isAuthenticated || !sdkReady || allPocCosts.length > 0) return;
+    try {
+      const pocPage = await fetchAllDpdRecords(sdk);
+      const maps = ctxRef.current?.choiceMaps ?? new Map();
+      const pocItems = pocPage.items.map((r) => translateRecord(r, maps));
+      if (vehicleCatalog) {
+        setAllPocCosts(pocItems);
+      } else {
+        const catalog = await loadVehicleCatalog(sdk, pocItems);
+        setVehicleCatalog(catalog);
+        setAllPocCosts(pocItems);
+      }
+    } catch {
+      /* dashboard/insights refresh shows errors via catalog load */
+    }
+  }, [sdk, isAuthenticated, sdkReady, allPocCosts.length, vehicleCatalog]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !sdkReady || !periodFilterActive) return;
+    void ensurePocCostsLoaded();
+  }, [periodFilterActive, isAuthenticated, sdkReady, ensurePocCostsLoaded]);
 
   const loadVehicleTabData = useCallback(async () => {
     if (!isAuthenticated || !sdkReady) return;
@@ -939,17 +1061,6 @@ export default function App() {
   const openVehicleInClaims = (plateQuery: string) => {
     setClaimFilters({ ...DEFAULT_CLAIMS_FILTERS, query: plateQuery });
     setMainSection('claims');
-  };
-
-  const openVehicleById = (vehicleId: string) => {
-    setMainSection('vehicles');
-    setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
-    setActiveVehicleId(vehicleId);
-  };
-
-  const openClaimById = (id: string) => {
-    setMainSection('claims');
-    void selectRecord(id);
   };
 
   const runAnalysis = async (ids: string[]) => {
@@ -1296,6 +1407,8 @@ export default function App() {
         onVehicleFiltersChange={setVehicleFilters}
         companyFilters={companyFilters}
         onCompanyFiltersChange={setCompanyFilters}
+        dashboardFilters={dashboardFilters}
+        onDashboardFiltersChange={setDashboardFilters}
         areaOptions={vehicleCatalog?.areaOptions ?? []}
         companyAreaOptions={companyCatalog?.areaOptions ?? []}
         vehicleCompanyOptions={vehicleCatalog?.companyOptions ?? []}
@@ -1306,9 +1419,11 @@ export default function App() {
             ? tableViewRecords.length
             : mainSection === 'vehicles'
               ? displayVehicles.length
-              : mainSection === 'companies'
-                ? displayCompanies.length
-                : allPocCosts.length
+              : mainSection === 'dashboard'
+                ? dashboardPoc.length
+                : mainSection === 'insights'
+                  ? insightsPoc.length
+                  : displayCompanies.length
         }
         totalCount={
           mainSection === 'claims'
@@ -1317,14 +1432,20 @@ export default function App() {
               ? (vehicleCatalog?.totalVehicles ?? 0)
               : mainSection === 'companies'
                 ? (companyCatalog?.totalCompanies ?? 0)
-                : allPocCosts.length
+                : pocSourceForPeriod.length
         }
         globalFilterActive={mainSection === 'claims' && globalFilterActive}
         datasetTotal={recordTotal}
+        period={periodFilter}
+        onPeriodChange={setPeriodFilter}
+        pocInPeriodCount={periodFilteredPoc.length}
+        pocTotalCount={pocSourceForPeriod.length}
         onReset={() => {
           setClaimFilters(DEFAULT_CLAIMS_FILTERS);
           setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
           setCompanyFilters(DEFAULT_COMPANY_FILTERS);
+          setDashboardFilters(DEFAULT_DASHBOARD_FILTERS);
+          setPeriodFilter(DEFAULT_PERIOD_FILTER);
         }}
       />
 
@@ -1717,44 +1838,21 @@ export default function App() {
           </div>
         ) : mainSection === 'dashboard' ? (
           <DashboardSection
-            stats={fleetStats}
-            health={fleetHealth}
-            vehicleCount={vehicleCatalog?.totalVehicles ?? 0}
-            companyCount={companyCatalog?.totalCompanies ?? 0}
-            loading={vehicleCatalogLoading}
-            error={vehicleCatalogError}
-            onRefresh={() => {
-              setVehicleCatalog(null);
-              setCompanyCatalog(null);
-              void loadVehicleTabData();
-              void loadCompanyTabData();
-            }}
-            onExportPdf={() =>
-              downloadFleetSummaryPdf({
-                stats: fleetStats,
-                vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
-                companyCount: companyCatalog?.totalCompanies ?? 0,
-              })
-            }
+            data={dashboardData}
+            loading={vehicleCatalogLoading || companyCatalogLoading}
+            period={periodFilter}
+            filters={dashboardFilters}
+            onFiltersChange={setDashboardFilters}
+            vehicleCount={vehicleCatalog?.totalVehicles ?? enrichedVehicles.length}
+            companyCount={companyCatalog?.totalCompanies ?? enrichedCompanies.length}
           />
         ) : mainSection === 'insights' ? (
           <InsightsSection
-            costs={allPocCosts}
-            vehicles={enrichedVehicles}
-            companies={enrichedCompanies}
-            fleetStats={fleetStats}
-            tableColumns={tableColumns}
-            flagsByCostId={flagsByCostId}
+            data={insightsData}
             loading={vehicleCatalogLoading || companyCatalogLoading}
-            error={vehicleCatalogError ?? companyCatalogError}
-            onRefresh={() => {
-              setVehicleCatalog(null);
-              setCompanyCatalog(null);
-              void loadVehicleTabData();
-              void loadCompanyTabData();
-            }}
-            onOpenClaim={openClaimById}
-            onOpenVehicle={openVehicleById}
+            period={periodFilter}
+            filters={dashboardFilters}
+            onFiltersChange={setDashboardFilters}
           />
         ) : (
           <CompaniesSection

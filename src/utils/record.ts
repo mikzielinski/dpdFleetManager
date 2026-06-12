@@ -357,6 +357,32 @@ export function extractFileDisplayName(v: unknown): string | undefined {
   return undefined;
 }
 
+function parseRecordDateValue(v: unknown): Date | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number' && v > 1_000_000_000_000) return new Date(v);
+  if (typeof v === 'string') {
+    const d = Date.parse(v);
+    if (Number.isFinite(d)) return new Date(d);
+  }
+  return null;
+}
+
+/** Data rozliczenia z pól biznesowych encji; na końcu CreateTime z Data Fabric. */
+export function getRecordDate(r: DpdRecord): Date | null {
+  const normalized = normalizeDpdRecord(r);
+  for (const key of FIELD_ALIASES.date) {
+    const v = normalized[key] ?? resolveRecordField(normalized, key, key);
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  for (const key of ['CreateTime', 'createTime']) {
+    const v = normalized[key];
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  return null;
+}
+
 export function formatDateValue(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   const raw = typeof v === 'string' || typeof v === 'number' ? String(v) : '';
