@@ -16,6 +16,7 @@ import {
   isDisplayableField,
   listInvoiceFileFieldCandidates,
   normalizeDpdRecord,
+  normalizeRegistration,
   pickVehicleFlagField,
   recordId,
   registrationsMatch,
@@ -116,13 +117,19 @@ export async function loadEntityContext(sdk: UiPath): Promise<EntityContext> {
   for (const field of entity.fields ?? []) {
     const csId = field.referenceChoiceSet?.id ?? (field as { choiceSetId?: string }).choiceSetId;
     if (!csId || !field.name) continue;
-    const page = await choiceSets.getById(csId, { pageSize: 200 });
-    const byId = new Map<number, string>();
-    for (const v of page.items) {
-      byId.set(v.numberId, v.displayName || v.name);
+    try {
+      const page = await choiceSets.getById(csId, { pageSize: 200 });
+      const byId = new Map<number, string>();
+      for (const v of page.items ?? []) {
+        byId.set(v.numberId, v.displayName || v.name);
+      }
+      choiceMaps.set(field.name, byId);
+      choiceMaps.set(fieldToColumnKey(field.name), byId);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn(`[DataFabric] ChoiceSet ${csId} (${field.name}):`, e);
+      }
     }
-    choiceMaps.set(field.name, byId);
-    choiceMaps.set(fieldToColumnKey(field.name), byId);
   }
 
   return { entity, fileFields, choiceMaps, tableColumns };
@@ -198,11 +205,15 @@ function normalizeRecordsPage(
   totalCount?: number;
 } {
   const r = result as Record<string, unknown>;
-  const items = (Array.isArray(r.items)
-    ? r.items
-    : Array.isArray(r.value)
-      ? r.value
-      : []) as DpdRecord[];
+  const items = (Array.isArray(r)
+    ? r
+    : Array.isArray(r.items)
+      ? r.items
+      : Array.isArray(r.value)
+        ? r.value
+        : Array.isArray(r.records)
+          ? r.records
+          : []) as DpdRecord[];
 
   const totalCount =
     typeof r.totalCount === 'number'
@@ -255,7 +266,7 @@ export async function updateRecordStatus(
   const entities = new Entities(sdk);
   const patch: Record<string, unknown> = { Status: status };
   if (managerNote?.trim()) {
-    patch.FraudFlag = 'true';
+    patch.Comments = managerNote.trim();
   }
   await entities.updateRecordById(DPD_POC_ENTITY_ID, recordId, patch, { expansionLevel: 1 });
 }
@@ -355,6 +366,88 @@ export async function fetchAllEntityRecords(
   return items;
 }
 
+export interface VehicleFlagsIndex {
+  byCostRecordId: Map<string, VehicleFlagHistoryItem>;
+  byRegistration: Map<string, VehicleFlagHistoryItem>;
+}
+
+function rowToVehicleFlagItem(row: DpdRecord): VehicleFlagHistoryItem {
+  return {
+    id: recordId(row),
+    vehicleId: pickVehicleFlagField(row, 'vehicleId'),
+    flaggedAt: pickVehicleFlagField(row, 'flaggedAt'),
+    description: pickVehicleFlagField(row, 'description'),
+    requiresAction: pickVehicleFlagField(row, 'requiresAction'),
+    aiConfidenceScore: pickVehicleFlagField(row, 'aiConfidenceScore'),
+    relatedCostRecordId: pickVehicleFlagField(row, 'relatedCostRecordId'),
+    raw: row,
+  };
+}
+
+function pickLatestFlag(pool: DpdRecord[]): DpdRecord | null {
+  if (pool.length === 0) return null;
+  pool.sort((a, b) => {
+    const da = Date.parse(pickVehicleFlagField(a, 'flaggedAt')) || 0;
+    const db = Date.parse(pickVehicleFlagField(b, 'flaggedAt')) || 0;
+    return db - da;
+  });
+  return pool[0];
+}
+
+export function buildVehicleFlagsIndex(rows: DpdRecord[]): VehicleFlagsIndex {
+  const byCostRecordId = new Map<string, VehicleFlagHistoryItem>();
+  const byRegistration = new Map<string, VehicleFlagHistoryItem>();
+
+  for (const row of rows) {
+    const item = rowToVehicleFlagItem(row);
+    const related = pickVehicleFlagField(row, 'relatedCostRecordId');
+    if (related !== '—') {
+      byCostRecordId.set(related.trim().toLowerCase(), item);
+    }
+    const reg =
+      pickVehicleFlagField(row, 'carRegistration') !== '—'
+        ? pickVehicleFlagField(row, 'carRegistration')
+        : pickVehicleFlagField(row, 'vehicleId');
+    if (reg !== '—') {
+      const norm = normalizeRegistration(reg);
+      if (norm) byRegistration.set(norm, item);
+    }
+  }
+
+  return { byCostRecordId, byRegistration };
+}
+
+export async function fetchVehicleFlagsIndex(sdk: UiPath): Promise<VehicleFlagsIndex> {
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    return { byCostRecordId: new Map(), byRegistration: new Map() };
+  }
+  const rows = await fetchAllEntityRecords(sdk, DPD_VEHICLE_FLAGS_ENTITY_ID, { expansionLevel: 0 });
+  return buildVehicleFlagsIndex(rows);
+}
+
+/** Synchronous lookup from a preloaded index (Related Cost Record ID, then registration). */
+export function resolveVehicleFlagFromIndex(
+  index: VehicleFlagsIndex | null | undefined,
+  costRecordId: string,
+  carRegistration?: string,
+): VehicleFlagHistoryItem | null {
+  if (!index) return null;
+  const idNorm = costRecordId.trim().toLowerCase();
+  if (idNorm) {
+    const byId = index.byCostRecordId.get(idNorm);
+    if (byId) return byId;
+  }
+  if (carRegistration?.trim()) {
+    const norm = normalizeRegistration(carRegistration);
+    if (norm) {
+      const byReg = index.byRegistration.get(norm);
+      if (byReg) return byReg;
+    }
+  }
+  return null;
+}
+
 /** Flag linked to a specific DPD_POC cost record (Related Cost Record ID), or latest for registration. */
 export async function fetchVehicleFlagForCostRecord(
   sdk: UiPath,
@@ -379,31 +472,22 @@ export async function fetchVehicleFlagForCostRecord(
     return related !== '—' && related.trim().toLowerCase() === idNorm;
   });
 
-  const pool = linked.length > 0 ? linked : carRegistration?.trim()
-    ? rows.filter((row) =>
-        registrationsMatch(carRegistration, pickVehicleFlagField(row, 'vehicleId')),
-      )
-    : [];
+  const pool =
+    linked.length > 0
+      ? linked
+      : carRegistration?.trim()
+        ? rows.filter((row) => {
+            const vehicleId = pickVehicleFlagField(row, 'vehicleId');
+            const regOnFlag = pickVehicleFlagField(row, 'carRegistration');
+            return (
+              registrationsMatch(carRegistration, vehicleId) ||
+              registrationsMatch(carRegistration, regOnFlag)
+            );
+          })
+        : [];
 
-  if (pool.length === 0) return null;
-
-  pool.sort((a, b) => {
-    const da = Date.parse(pickVehicleFlagField(a, 'flaggedAt')) || 0;
-    const db = Date.parse(pickVehicleFlagField(b, 'flaggedAt')) || 0;
-    return db - da;
-  });
-
-  const row = pool[0];
-  return {
-    id: recordId(row),
-    vehicleId: pickVehicleFlagField(row, 'vehicleId'),
-    flaggedAt: pickVehicleFlagField(row, 'flaggedAt'),
-    description: pickVehicleFlagField(row, 'description'),
-    requiresAction: pickVehicleFlagField(row, 'requiresAction'),
-    aiConfidenceScore: pickVehicleFlagField(row, 'aiConfidenceScore'),
-    relatedCostRecordId: pickVehicleFlagField(row, 'relatedCostRecordId'),
-    raw: row,
-  };
+  const row = pickLatestFlag(pool);
+  return row ? rowToVehicleFlagItem(row) : null;
 }
 
 /** Previous flags for the same registration (DPD_VehicleFlags), excluding the active fee record when linked. */

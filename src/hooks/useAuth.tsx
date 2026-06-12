@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { BrandLogo } from '../components/BrandLogo';
+import { BRAND } from '../brand';
 import { UiPath } from '@uipath/uipath-typescript/core';
 import type { UiPathSDKConfig } from '@uipath/uipath-typescript/core';
 import {
@@ -22,6 +24,7 @@ import {
   isRedirectUriEnvOverride,
   isStudioDesignerPreview,
   readPersistedOAuthUrlError,
+  resolveOAuthScope,
   resolveRedirectUri,
   getAccountAccessErrorHint,
 } from '../utils/oauthRedirect';
@@ -38,6 +41,8 @@ export { BYPASS_AUTH };
 interface AuthContextValue {
   sdk: UiPath;
   isAuthenticated: boolean;
+  /** True after SDK initialize() / OAuth callback — safe to call Data Fabric APIs */
+  sdkReady: boolean;
   isInitializing: boolean;
   authError: string | null;
   oauthUrlError: string | null;
@@ -64,7 +69,7 @@ function readAuthConfig(): AuthConfigResult {
   const clientId =
     getMetaTagContent('uipath:client-id') ||
     (import.meta.env.VITE_UIPATH_CLIENT_ID ?? '').trim();
-  const scope = (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim();
+  const scope = resolveOAuthScope();
   const orgName =
     getMetaTagContent('uipath:org-name') || (import.meta.env.VITE_UIPATH_ORG_NAME ?? '').trim();
   const tenantName =
@@ -207,8 +212,8 @@ function AuthConfigScreen({ result }: { result: Extract<AuthConfigResult, { ok: 
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
-        <h1>Fleet Manager — konfiguracja OAuth</h1>
+        <BrandLogo />
+        <h1>{BRAND.name} — konfiguracja OAuth</h1>
         <p className="config-lead">{result.message}</p>
 
         <h2 className="config-subtitle">Brakujące zmienne</h2>
@@ -268,8 +273,8 @@ export function AuthLoginScreen({
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
-        <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : 'Fleet Manager'}</h1>
+        <BrandLogo />
+        <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : BRAND.name}</h1>
 
         {showOAuthFailure ? (
           <>
@@ -374,6 +379,7 @@ function AuthProviderInner({
   }, [redirectUri, bypassAuth]);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => bypassAuth || sdk.isAuthenticated());
+  const [sdkReady, setSdkReady] = useState(() => bypassAuth);
   const [isInitializing, setIsInitializing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [oauthUrlError, setOauthUrlError] = useState<string | null>(() => consumeOAuthUrlError());
@@ -399,8 +405,10 @@ function AuthProviderInner({
       setSdk(activeSdk);
       setRedirectUri(freshRedirect);
       await activeSdk.initialize();
-      setIsAuthenticated(activeSdk.isAuthenticated());
-      if (activeSdk.isAuthenticated()) {
+      const authed = activeSdk.isAuthenticated();
+      setIsAuthenticated(authed);
+      setSdkReady(authed);
+      if (authed) {
         clearPersistedOAuthUrlError();
         setOauthUrlError(null);
       }
@@ -443,12 +451,25 @@ function AuthProviderInner({
       }
 
       if (!sdk.isInOAuthCallback()) {
-        if (!cancelled) {
-          refreshAuth();
-          if (sdk.isAuthenticated()) {
-            clearPersistedOAuthUrlError();
-            setOauthUrlError(null);
+        if (!cancelled) setIsInitializing(true);
+        try {
+          await sdk.initialize();
+          if (!cancelled) {
+            refreshAuth();
+            const authed = sdk.isAuthenticated();
+            setSdkReady(authed);
+            if (authed) {
+              clearPersistedOAuthUrlError();
+              setOauthUrlError(null);
+            }
           }
+        } catch (e) {
+          if (!cancelled) {
+            setAuthError(e instanceof Error ? e.message : String(e));
+            setSdkReady(false);
+          }
+        } finally {
+          if (!cancelled) setIsInitializing(false);
         }
         return;
       }
@@ -462,8 +483,10 @@ function AuthProviderInner({
         }
         await activeSdk.completeOAuth();
         if (!cancelled) {
-          setIsAuthenticated(activeSdk.isAuthenticated());
-          if (activeSdk.isAuthenticated()) {
+          const authed = activeSdk.isAuthenticated();
+          setIsAuthenticated(authed);
+          setSdkReady(authed);
+          if (authed) {
             clearPersistedOAuthUrlError();
             setOauthUrlError(null);
           }
@@ -486,6 +509,7 @@ function AuthProviderInner({
     () => ({
       sdk,
       isAuthenticated,
+      sdkReady,
       isInitializing,
       authError,
       oauthUrlError,
@@ -496,6 +520,7 @@ function AuthProviderInner({
     [
       sdk,
       isAuthenticated,
+      sdkReady,
       isInitializing,
       authError,
       oauthUrlError,

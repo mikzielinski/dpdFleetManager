@@ -13,6 +13,21 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   netPrice: ['NetPrice', 'netPrice'],
   grossPrice: ['GrossPrice', 'grossPrice', 'Brutto', 'brutto'],
   decision: ['Status', 'status', 'decision', 'Decision'],
+  autoDecision: [
+    'AutoDecision',
+    'autoDecision',
+    'AgentDecision',
+    'AutomaticDecision',
+    'MaestroDecision',
+    'Auto Decision',
+  ],
+  validationStatus: [
+    'ValidationStatus',
+    'validationStatus',
+    'InvoiceValidation',
+    'InvoiceValidationStatus',
+    'Validation',
+  ],
   serviceType: ['ServiceType', 'serviceType'],
   riskLevel: ['RiskLevel', 'riskLevel'],
   combinedScore: ['CombinedScore', 'combinedScore'],
@@ -43,6 +58,7 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
     'GrossPrice',
     'grossPrice',
   ],
+  /** W DF FraudFlag to często boolean anomalii po analizie (wyświetlane jako „Anomalia”). */
   anomalyReason: ['AnomalyReason', 'anomalyReason', 'FraudFlag', 'fraudFlag'],
   comments: ['Comments', 'comments', 'ManagerComment', 'managerComment'],
 };
@@ -64,7 +80,11 @@ const VEHICLE_FLAG_FIELD_ALIASES: Record<string, readonly string[]> = {
     'RelatedCostRecordID',
     'RelatedCostRecordId',
     'relatedCostRecordId',
+    'RecordID',
+    'RecordId',
+    'recordId',
   ],
+  carRegistration: ['CarRegistration', 'Car Registration', 'carRegistration'],
   companyId: ['Company ID', 'CompanyId', 'companyId'],
   riskLevel: ['Severity', 'Risk Level', 'RiskLevel', 'riskLevel'],
   flagType: ['Flag Type', 'FlagType', 'flagType', 'Anomaly Type', 'AnomalyType'],
@@ -338,6 +358,32 @@ export function extractFileDisplayName(v: unknown): string | undefined {
   return undefined;
 }
 
+function parseRecordDateValue(v: unknown): Date | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number' && v > 1_000_000_000_000) return new Date(v);
+  if (typeof v === 'string') {
+    const d = Date.parse(v);
+    if (Number.isFinite(d)) return new Date(d);
+  }
+  return null;
+}
+
+/** Data rozliczenia z pól biznesowych encji; na końcu CreateTime z Data Fabric. */
+export function getRecordDate(r: DpdRecord): Date | null {
+  const normalized = normalizeDpdRecord(r);
+  for (const key of FIELD_ALIASES.date) {
+    const v = normalized[key] ?? resolveRecordField(normalized, key, key);
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  for (const key of ['CreateTime', 'createTime']) {
+    const v = normalized[key];
+    const d = parseRecordDateValue(v);
+    if (d) return d;
+  }
+  return null;
+}
+
 export function formatDateValue(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   const raw = typeof v === 'string' || typeof v === 'number' ? String(v) : '';
@@ -416,7 +462,7 @@ export function riskColor(level: string | undefined): string {
     case 'critical':
       return '#8b0000';
     case 'high':
-      return '#dc0032';
+      return '#2C2760';
     case 'medium':
       return '#e87722';
     case 'low':

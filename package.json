@@ -1,14 +1,15 @@
 {
   "name": "dpd-fleet-manager",
-  "version": "1.2.9",
+  "version": "1.6.8",
   "private": true,
-  "description": "DPD Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro DPDDataInvestigator",
+  "description": "Xelto Express Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy:staging": "node scripts/deploy-staging.mjs 1.2.9"
+    "clean": "node scripts/clean-artifacts.mjs",
+    "deploy:staging": "node scripts/deploy-staging.mjs"
   },
   "dependencies": {
     "@uipath/uipath-typescript": "^1.3.8",

@@ -3,6 +3,10 @@ import { resolveSchemaFieldName } from './entityFields';
 import type { DpdRecord } from './record';
 import { normalizeRegistration } from './record';
 
+/** Uzupełnij compliance gdy Fabric nie ma pól (staging). Wyłącz: VITE_STAGING_COMPLIANCE_ENRICH=false */
+export const STAGING_COMPLIANCE_ENRICH_ENABLED =
+  import.meta.env.VITE_STAGING_COMPLIANCE_ENRICH !== 'false';
+
 export type ComplianceStatus = 'ok' | 'due_soon' | 'expired' | 'unknown';
 
 export type InsurancePolicyType = 'OC' | 'AC' | 'NNW' | 'Assistance' | 'Inne';
