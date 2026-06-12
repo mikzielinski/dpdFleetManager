@@ -212,22 +212,27 @@ export function VehiclesWithHealthChart({
 }) {
   const rankRows = rows.map((r) => ({ name: r.name, total: r.total, count: r.count }));
   return (
-    <div className="dash-chart-card">
-      <TopVehiclesWithAvg rows={rankRows} fleetAverage={fleetAverage} />
-      <ul className="insight-vehicle-health-list">
-        {rows.slice(0, 6).map((r) => (
-          <li key={r.name}>
-            <span>{r.name}</span>
-            {r.healthGrade ? (
-              <span className={`health-grade health-grade-${r.healthGrade.toLowerCase()}`}>
-                {r.healthScore}
-              </span>
-            ) : (
-              <span className="insight-muted">—</span>
-            )}
-          </li>
-        ))}
-      </ul>
+    <div className="dash-chart-card insights-vehicle-card">
+      <div className="insights-vehicle-split">
+        <TopVehiclesWithAvg rows={rankRows} fleetAverage={fleetAverage} embedded />
+        <aside className="insights-vehicle-health-aside" aria-label="Health score pojazdów">
+          <h5 className="insights-vehicle-health-title">Health score</h5>
+          <ul className="insights-vehicle-health-compact">
+            {rows.slice(0, 10).map((r) => (
+              <li key={r.name}>
+                <span className="insights-vehicle-health-plate">{r.name}</span>
+                {r.healthGrade ? (
+                  <span className={`health-grade health-grade-${r.healthGrade.toLowerCase()}`}>
+                    {r.healthScore}
+                  </span>
+                ) : (
+                  <span className="insight-muted">—</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      </div>
     </div>
   );
 }

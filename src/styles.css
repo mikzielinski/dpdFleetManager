@@ -2586,6 +2586,156 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   margin-bottom: 28px;
 }
 
+/* Trendy — pełna szerokość, słupki rozciągnięte */
+.insights-trends-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.insights-trends-grid .dash-chart-wide {
+  grid-column: 1 / -1;
+}
+
+.insights-trends-grid .insight-trend-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 10px;
+  width: 100%;
+  align-items: end;
+}
+
+.insights-trends-grid .insight-trend-col {
+  flex: unset;
+  min-width: 0;
+  width: 100%;
+}
+
+.insights-trends-grid .insight-trend-stack {
+  width: 100%;
+  max-width: 88px;
+  margin: 0 auto;
+}
+
+.insights-trends-grid .dash-column-chart {
+  justify-content: stretch;
+  gap: 10px;
+  width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.insights-trends-grid .dash-column {
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 0;
+}
+
+.insights-trends-grid .dash-column-bar-wrap {
+  max-width: none;
+}
+
+.insights-trends-grid .insight-health-trend {
+  width: 100%;
+  gap: 12px;
+}
+
+.insights-trends-grid .insight-health-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.insights-trends-grid .insight-health-stack {
+  width: 100%;
+  max-width: 64px;
+}
+
+/* Rozkład — szersza siatka na dużych ekranach */
+.insights-distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .insights-distribution-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.insights-distribution-grid .insights-vehicle-card {
+  grid-column: 1 / -1;
+}
+
+.insights-vehicle-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px);
+  gap: 20px 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.dash-vehicle-bars-embedded .dash-labeled-bar-row {
+  grid-template-columns: minmax(88px, 0.9fr) minmax(0, 3fr) minmax(96px, auto);
+  margin-bottom: 8px;
+}
+
+.insights-vehicle-health-aside {
+  background: #fafafa;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.insights-vehicle-health-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+.insights-vehicle-health-compact {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.insights-vehicle-health-compact li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.insights-vehicle-health-plate {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .insights-vehicle-split {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-trends-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .insights-layer-head h3 {
   font-size: 15px;
   font-weight: 800;

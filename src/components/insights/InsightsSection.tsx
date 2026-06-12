@@ -138,7 +138,7 @@ export function InsightsSection({ data, loading, period, filters, onFiltersChang
           <h3>Trendy (6 miesięcy)</h3>
           <p>Czy koszty i anomalie idą w dobrym kierunku?</p>
         </header>
-        <div className="dashboard-grid dashboard-grid-overview">
+        <div className="insights-trends-grid">
           <CostsTrendChart
             months={data.trends.costsByMonth}
             budgetMonthly={data.trends.budgetMonthly}
@@ -153,7 +153,7 @@ export function InsightsSection({ data, loading, period, filters, onFiltersChang
         <header className="insights-layer-head">
           <h3>Rozkład — gdzie idą pieniądze</h3>
         </header>
-        <div className="dashboard-grid dashboard-grid-overview">
+        <div className="insights-distribution-grid">
           <CategoryDistribution items={data.distribution.byCategory} />
           <RegionDualChart rows={data.distribution.regionsDual} />
           <CompaniesTable rows={data.distribution.topCompanies} />

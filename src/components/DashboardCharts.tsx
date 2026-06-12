@@ -467,16 +467,19 @@ export function HealthGaugePanel({
 export function TopVehiclesWithAvg({
   rows,
   fleetAverage,
+  embedded = false,
 }: {
   rows: RankRow[];
   fleetAverage: number;
+  /** Bez zewnętrznej karty — do osadzenia w szerszym panelu Insights. */
+  embedded?: boolean;
 }) {
   if (!rows.length) return null;
   const max = Math.max(...rows.map((r) => r.total), fleetAverage, 1);
   const avgPct = Math.round((fleetAverage / max) * 100);
 
-  return (
-    <div className="dash-chart-card">
+  const body = (
+    <>
       <h4 className="dash-chart-title">Top pojazdy (koszt)</h4>
       <div className="dash-avg-legend">
         <span className="dash-avg-line-swatch" />
@@ -505,8 +508,11 @@ export function TopVehiclesWithAvg({
           );
         })}
       </ul>
-    </div>
+    </>
   );
+
+  if (embedded) return <div className="dash-vehicle-bars-embedded">{body}</div>;
+  return <div className="dash-chart-card">{body}</div>;
 }
 
 function FuelRegionRows({ rows, maxCost, maxCount }: { rows: RegionFuelRow[]; maxCost: number; maxCount: number }) {
