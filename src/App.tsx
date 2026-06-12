@@ -46,7 +46,11 @@ import {
   needsFullDatasetFilters,
   type ClaimsFilterState,
 } from './utils/filterRecords';
-import { getCaseStatusFromRecord } from './utils/caseStatus';
+import {
+  ANALYSIS_DETAIL_FIELD_KEYS,
+  getCaseStatusFromRecord,
+  isApprovedStatus,
+} from './utils/caseStatus';
 import {
   findLatestInstance,
   isTerminalStatus,
@@ -1222,7 +1226,11 @@ export default function App() {
       !!invoiceBlob ||
       invoiceLoading;
 
+    const record = detailRecord ?? activeRecord;
+    const approved = record ? isApprovedStatus(record, tableColumns) : false;
+
     return DETAIL_FIELD_KEYS.filter((key) => {
+      if (approved && ANALYSIS_DETAIL_FIELD_KEYS.has(key)) return false;
       if (key === 'invoiceFileName') {
         return hasInvoiceAttachment && (!!invoiceBlob || invoiceLoading);
       }
@@ -1240,6 +1248,7 @@ export default function App() {
     invoiceBlob,
     invoiceLoading,
     ctx?.fileFields,
+    tableColumns,
   ]);
 
   const fullWidthFieldSet = useMemo(

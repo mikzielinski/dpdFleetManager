@@ -37,6 +37,18 @@ function isFinalManagerDecision(statusText: string): boolean {
   return /approv|zatwier|reject|odrzu/i.test(statusText);
 }
 
+export function isApprovedStatus(record: DpdRecord, tableColumns?: TableColumn[]): boolean {
+  return /approv|zatwier/i.test(resolveStatusText(record, tableColumns));
+}
+
+/** Pola z analizy Maestro — ukryte po zatwierdzeniu przez managera. */
+export const ANALYSIS_DETAIL_FIELD_KEYS = new Set([
+  'anomalyReason',
+  'riskLevel',
+  'combinedScore',
+  'flagType',
+]);
+
 export function classifyCaseStatus(
   statusText: string,
   options?: { fraud?: boolean },
