@@ -323,7 +323,7 @@ export function GlobalFilterBar({
               checked={filters.flaggedOnly}
               onChange={(e) => patch({ flaggedOnly: e.target.checked })}
             />
-            <span>Tylko z oznaczeniem / anomalią</span>
+            <span>Tylko przeanalizowane</span>
           </label>
         </div>
       ) : section === 'vehicles' ? (
