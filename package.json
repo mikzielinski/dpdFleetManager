@@ -1,8 +1,8 @@
 {
   "name": "dpd-fleet-manager",
-  "version": "1.5.5",
+  "version": "1.6.0",
   "private": true,
-  "description": "DPD Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro DPDDataInvestigator",
+  "description": "Xelto Express Fleet Manager – koszty kierowców, podgląd faktur, analiza Maestro",
   "type": "module",
   "scripts": {
     "dev": "vite",

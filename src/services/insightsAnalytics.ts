@@ -542,7 +542,7 @@ export function buildInsightsData(
       label: meta?.label ?? c.category,
       total: c.total,
       count: c.count,
-      color: meta?.color ?? '#dc0032',
+      color: meta?.color ?? '#2C2760',
     };
   });
 

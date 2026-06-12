@@ -5,6 +5,7 @@ import type { RegionFuelRow } from '../services/regionFuelAnalytics';
 import type { HealthBucket } from '../services/dashboardAnalytics';
 import { barToneForValue, type BarTone } from '../utils/dashboardBarTone';
 import { isUnassignedLabel } from '../utils/dashboardFilters';
+import { BRAND } from '../brand';
 import { SERVICE_CATEGORIES, type ServiceCategory } from '../utils/serviceCategories';
 
 export interface ChartSegment {
@@ -196,7 +197,7 @@ export function categorySegments(
     return {
       label: meta?.label ?? c.category,
       value: c.total,
-      color: meta?.color ?? '#dc0032',
+      color: meta?.color ?? BRAND.indigo,
       meta: `${c.count} · ${formatPln(c.total)} PLN`,
     };
   });
@@ -205,7 +206,7 @@ export function categorySegments(
 export function decisionSegments(
   items: { label: string; count: number }[],
 ): ChartSegment[] {
-  const palette = ['#2a9d8f', '#dc0032', '#e9c46a', '#6c757d', '#0077b6', '#7b2cbf'];
+  const palette = ['#2a9d8f', BRAND.indigo, '#e9c46a', '#6c757d', '#0077b6', '#7b2cbf'];
   return items.map((d, i) => ({
     label: d.label,
     value: d.count,
@@ -223,7 +224,7 @@ function toneClass(tone: BarTone): string {
 function decisionColor(label: string): string {
   const l = label.toLowerCase();
   if (/zatwier|approv/i.test(l)) return '#2a9d8f';
-  if (/flag|anomal/i.test(l)) return '#dc0032';
+  if (/flag|anomal/i.test(l)) return BRAND.indigo;
   if (/oczek|pend/i.test(l)) return '#e9c46a';
   return '#9ca3af';
 }
@@ -320,7 +321,7 @@ export function CategoryShareBars({
                   className="dash-labeled-bar-fill"
                   style={{
                     width: `${pctBar}%`,
-                    backgroundColor: meta?.color ?? '#dc0032',
+                    backgroundColor: meta?.color ?? BRAND.indigo,
                   }}
                 />
               </div>
@@ -647,7 +648,7 @@ export function healthSegments(
     'B (65–79)': '#52b788',
     'C (50–64)': '#e9c46a',
     'D (35–49)': '#f4a261',
-    'F (<35)': '#dc0032',
+    'F (<35)': BRAND.indigo,
     'Brak oceny': '#adb5bd',
   };
   return items.map((b) => ({

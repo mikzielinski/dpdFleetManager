@@ -29,6 +29,8 @@ import {
   type EntityContext,
   type VehicleFlagHistoryItem,
 } from './services/dataFabric';
+import { BrandLogo } from './components/BrandLogo';
+import { BRAND } from './brand';
 import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
 import { DashboardSection } from './components/DashboardSection';
@@ -1307,9 +1309,9 @@ export default function App() {
     <div className="app-shell">
       <header className="header">
         <div className="header-left">
-          <div className="dpd-logo">DPD</div>
+          <BrandLogo />
           <span className="header-sep">|</span>
-          <span className="header-title">Fleet Manager — koszty kierowców</span>
+          <span className="header-title">{BRAND.productTitle}</span>
           <span className="header-version" title="Wersja aplikacji">
             v{import.meta.env.VITE_APP_VERSION ?? '?'}
           </span>

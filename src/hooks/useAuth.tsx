@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { BrandLogo } from '../components/BrandLogo';
+import { BRAND } from '../brand';
 import { UiPath } from '@uipath/uipath-typescript/core';
 import type { UiPathSDKConfig } from '@uipath/uipath-typescript/core';
 import {
@@ -210,8 +212,8 @@ function AuthConfigScreen({ result }: { result: Extract<AuthConfigResult, { ok: 
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
-        <h1>Fleet Manager — konfiguracja OAuth</h1>
+        <BrandLogo />
+        <h1>{BRAND.name} — konfiguracja OAuth</h1>
         <p className="config-lead">{result.message}</p>
 
         <h2 className="config-subtitle">Brakujące zmienne</h2>
@@ -271,8 +273,8 @@ export function AuthLoginScreen({
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
-        <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : 'Fleet Manager'}</h1>
+        <BrandLogo />
+        <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : BRAND.name}</h1>
 
         {showOAuthFailure ? (
           <>

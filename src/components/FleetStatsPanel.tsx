@@ -1,6 +1,7 @@
 import type { FleetCostStats } from '../services/fleetStats';
 import type { HealthScoreResult } from '../utils/healthScore';
 import { healthGradeClass } from '../utils/healthScore';
+import { BRAND } from '../brand';
 import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 
 interface Props {
@@ -84,7 +85,7 @@ export function FleetStatsPanel({ stats, health, title = 'Statystyki', onExportP
                   <div className="category-bar-track">
                     <div
                       className="category-bar-fill"
-                      style={{ width: `${pct}%`, backgroundColor: meta?.color ?? '#dc0032' }}
+                      style={{ width: `${pct}%`, backgroundColor: meta?.color ?? BRAND.indigo }}
                     />
                   </div>
                   <span className="category-bar-meta">

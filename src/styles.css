@@ -1,3 +1,12 @@
+:root {
+  --xel-indigo: #2c2760;
+  --xel-navy: #08162d;
+  --xel-indigo-hover: #3d3678;
+  --xel-gradient: linear-gradient(135deg, #2c2760 0%, #08162d 100%);
+  --brand-accent: var(--xel-indigo);
+  --brand-accent-hover: var(--xel-indigo-hover);
+}
+
 *,
 *::before,
 *::after {
@@ -21,7 +30,7 @@ body {
 }
 
 .header {
-  background: #dc0032;
+  background: var(--xel-gradient);
   color: #fff;
   padding: 12px 20px;
   display: flex;
@@ -37,10 +46,34 @@ body {
   gap: 12px;
 }
 
-.dpd-logo {
+.brand-logo {
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.brand-logo-main {
+  display: block;
+  font-size: 22px;
   font-weight: 900;
-  font-size: 26px;
-  letter-spacing: 2px;
+  letter-spacing: 0.04em;
+}
+
+.brand-logo-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
+.auth-card .brand-logo {
+  color: var(--xel-indigo);
+  text-align: center;
+  margin-bottom: 4px;
 }
 
 .header-sep {
@@ -165,13 +198,13 @@ body {
 }
 
 .main-nav-btn:hover {
-  color: #dc0032;
+  color: var(--xel-indigo);
   background: #fafafa;
 }
 
 .main-nav-btn-active {
-  color: #dc0032;
-  border-bottom-color: #dc0032;
+  color: var(--xel-indigo);
+  border-bottom-color: var(--xel-indigo);
   background: #fff;
 }
 
@@ -204,7 +237,7 @@ body {
 .btn-link-reset {
   background: none;
   border: none;
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -213,7 +246,7 @@ body {
 }
 
 .btn-link-reset:hover {
-  color: #a30025;
+  color: var(--xel-indigo-hover);
 }
 
 .global-filter-controls {
@@ -481,7 +514,7 @@ tbody tr:hover {
 }
 
 .invoice-download-link {
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 600;
   text-decoration: none;
 }
@@ -560,7 +593,7 @@ tbody tr:hover {
 }
 
 .preview-error {
-  color: #dc0032;
+  color: var(--xel-indigo);
 }
 
 .analysis-panel {
@@ -572,7 +605,7 @@ tbody tr:hover {
 .fraud-note {
   margin: 8px 0 14px;
   padding: 12px 16px;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 6px;
   line-height: 1.55;
 }
@@ -675,7 +708,7 @@ tbody tr:hover {
 .case-history-card {
   background: #fff;
   border: 1px solid #ddd;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -726,13 +759,13 @@ tbody tr:hover {
 }
 
 .btn-primary {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
 .btn-analyze {
   background: #fff;
-  color: #dc0032;
+  color: var(--xel-indigo);
   border-color: #fff;
 }
 
@@ -748,7 +781,7 @@ tbody tr:hover {
 }
 
 .btn-reject {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
@@ -858,7 +891,7 @@ tbody tr:hover {
 }
 
 .error-text {
-  color: #dc0032;
+  color: var(--xel-indigo);
   margin: 8px 0;
   font-size: 13px;
 }
@@ -867,7 +900,7 @@ tbody tr:hover {
   width: 36px;
   height: 36px;
   border: 4px solid #e0e0e0;
-  border-top-color: #dc0032;
+  border-top-color: var(--xel-indigo);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -932,13 +965,13 @@ tbody tr:hover {
 }
 
 .period-chip:hover {
-  border-color: #dc0032;
-  color: #dc0032;
+  border-color: var(--xel-indigo);
+  color: var(--xel-indigo);
 }
 
 .period-chip-active {
-  background: #dc0032;
-  border-color: #dc0032;
+  background: var(--xel-indigo);
+  border-color: var(--xel-indigo);
   color: #fff;
 }
 
@@ -1342,7 +1375,7 @@ table:not(.fleet-table) td {
 }
 
 .preview-error {
-  color: #dc0032;
+  color: var(--xel-indigo);
 }
 
 .analysis-panel {
@@ -1354,7 +1387,7 @@ table:not(.fleet-table) td {
 .fraud-note {
   margin: 8px 0 14px;
   padding: 12px 16px;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 6px;
   line-height: 1.55;
 }
@@ -1457,7 +1490,7 @@ table:not(.fleet-table) td {
 .case-history-card {
   background: #fff;
   border: 1px solid #ddd;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -1508,13 +1541,13 @@ table:not(.fleet-table) td {
 }
 
 .btn-primary {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
 .btn-analyze {
   background: #fff;
-  color: #dc0032;
+  color: var(--xel-indigo);
   border-color: #fff;
 }
 
@@ -1530,7 +1563,7 @@ table:not(.fleet-table) td {
 }
 
 .btn-reject {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
@@ -1640,7 +1673,7 @@ table:not(.fleet-table) td {
 }
 
 .error-text {
-  color: #dc0032;
+  color: var(--xel-indigo);
   margin: 8px 0;
   font-size: 13px;
 }
@@ -1649,7 +1682,7 @@ table:not(.fleet-table) td {
   width: 36px;
   height: 36px;
   border: 4px solid #e0e0e0;
-  border-top-color: #dc0032;
+  border-top-color: var(--xel-indigo);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1668,12 +1701,12 @@ table:not(.fleet-table) td {
 
 .main-nav-btn-report {
   margin-left: auto;
-  border-color: #dc0032;
-  color: #dc0032;
+  border-color: var(--xel-indigo);
+  color: var(--xel-indigo);
 }
 
 .main-nav-btn-report:hover {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
@@ -1704,7 +1737,7 @@ table:not(.fleet-table) td {
   gap: 12px;
   padding: 12px;
   background: #fff;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 4px;
   margin-bottom: 14px;
 }
@@ -1742,7 +1775,7 @@ table:not(.fleet-table) td {
   color: #333;
 }
 .health-grade-f {
-  background: #dc0032;
+  background: var(--xel-indigo);
 }
 
 .health-score-value {
@@ -1776,7 +1809,7 @@ table:not(.fleet-table) td {
 }
 
 .health-factor-impact {
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 600;
 }
 
@@ -1874,7 +1907,7 @@ table:not(.fleet-table) td {
 }
 
 .compliance-status-expired {
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 600;
 }
 
@@ -1932,7 +1965,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .th-sort-btn:hover {
-  color: #dc0032;
+  color: var(--xel-indigo);
   background: #f5f5f4;
 }
 
@@ -1944,7 +1977,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 
 .th-sortable .th-sort-btn[aria-sort='ascending'] .th-sort-icon,
 .th-sortable .th-sort-btn[aria-sort='descending'] .th-sort-icon {
-  color: #dc0032;
+  color: var(--xel-indigo);
 }
 
 .dashboard-panel {
@@ -1990,7 +2023,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .dash-bar-fill {
-  background: #dc0032;
+  background: var(--xel-indigo);
 }
 
 .dash-bar-health {
@@ -2036,7 +2069,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 .dash-column-bar {
   width: 100%;
   min-height: 6px;
-  background: linear-gradient(180deg, #dc0032, #a80028);
+  background: linear-gradient(180deg, var(--xel-indigo), var(--xel-navy));
   border-radius: 6px 6px 0 0;
   transition: height 0.15s ease;
 }
@@ -2180,7 +2213,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   display: block;
   font-size: 16px;
   font-weight: 800;
-  color: #dc0032;
+  color: var(--xel-indigo);
 }
 
 .dash-stat-card-meta {
@@ -2333,7 +2366,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .dash-bar-alert {
-  background: #dc0032;
+  background: var(--xel-indigo);
 }
 
 .dash-labeled-bar-end {
@@ -2384,7 +2417,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 
 .dash-gauge-meter {
   height: 10px;
-  background: linear-gradient(90deg, #dc0032 0%, #e9c46a 45%, #2a9d8f 100%);
+  background: linear-gradient(90deg, var(--xel-indigo) 0%, #e9c46a 45%, #2a9d8f 100%);
   border-radius: 5px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -2451,7 +2484,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 .dash-avg-line-swatch {
   width: 20px;
   height: 0;
-  border-top: 2px dashed #dc0032;
+  border-top: 2px dashed var(--xel-indigo);
 }
 
 .dash-bars-with-avg {
@@ -2477,7 +2510,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   top: -88px;
   bottom: -8px;
   width: 2px;
-  background: repeating-linear-gradient(180deg, #dc0032, #dc0032 4px, transparent 4px, transparent 8px);
+  background: repeating-linear-gradient(180deg, var(--xel-indigo), var(--xel-indigo) 4px, transparent 4px, transparent 8px);
   transform: translateX(-50%);
   z-index: 2;
 }
@@ -2771,13 +2804,13 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .insights-grade-chip:hover {
-  border-color: #dc0032;
-  color: #dc0032;
+  border-color: var(--xel-indigo);
+  color: var(--xel-indigo);
 }
 
 .insights-grade-chip-active {
-  background: #dc0032;
-  border-color: #dc0032;
+  background: var(--xel-indigo);
+  border-color: var(--xel-indigo);
   color: #fff;
 }
 
@@ -2820,7 +2853,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .insight-alert-flag {
-  border-left-color: #dc0032;
+  border-left-color: var(--xel-indigo);
 }
 
 .insight-alert-clock {
@@ -2887,7 +2920,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 
 .insight-budget-progress-fill {
   height: 100%;
-  background: #dc0032;
+  background: var(--xel-indigo);
   border-radius: 4px;
   max-width: 100%;
 }
@@ -3126,7 +3159,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .sortable-head-btn:hover {
-  color: #dc0032;
+  color: var(--xel-indigo);
 }
 
 .sortable-indicator {
@@ -3152,17 +3185,17 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 
 .column-filter-input:focus {
   outline: none;
-  border-color: #dc0032;
+  border-color: var(--xel-indigo);
 }
 
 .main-nav-btn-report {
   margin-left: auto;
-  border-color: #dc0032;
-  color: #dc0032;
+  border-color: var(--xel-indigo);
+  color: var(--xel-indigo);
 }
 
 .main-nav-btn-report:hover {
-  background: #dc0032;
+  background: var(--xel-indigo);
   color: #fff;
 }
 
@@ -3193,7 +3226,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   gap: 12px;
   padding: 12px;
   background: #fff;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid var(--xel-indigo);
   border-radius: 4px;
   margin-bottom: 14px;
 }
@@ -3231,7 +3264,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
   color: #333;
 }
 .health-grade-f {
-  background: #dc0032;
+  background: var(--xel-indigo);
 }
 
 .health-score-value {
@@ -3265,7 +3298,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .health-factor-impact {
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 600;
 }
 
@@ -3358,7 +3391,7 @@ table.fleet-table thead th.col-numeric .th-sort-btn {
 }
 
 .compliance-status-expired {
-  color: #dc0032;
+  color: var(--xel-indigo);
   font-weight: 600;
 }
 
