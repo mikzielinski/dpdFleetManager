@@ -1,5 +1,5 @@
 import type { TableColumn } from '../config';
-import { getCaseStatusFromRecord, isFraudCase } from '../utils/caseStatus';
+import { getCaseStatusFromRecord } from '../utils/caseStatus';
 import type { DpdRecord } from '../utils/record';
 
 interface Props {
@@ -9,8 +9,7 @@ interface Props {
 
 export function CaseStatusBadge({ record, tableColumns }: Props) {
   const info = getCaseStatusFromRecord(record, tableColumns);
-  const showFraudTag =
-    info.kind === 'fraud' && !/fraud/i.test(info.label) && isFraudCase(record, info.label);
+  const showFraudTag = info.kind === 'fraud' && !/fraud|oszust/i.test(info.label);
 
   return (
     <span className={info.badgeClass}>

@@ -13,28 +13,28 @@ export interface CaseStatusInfo {
   chartColor: string;
 }
 
-function isTruthyFlag(value: string): boolean {
-  if (!value || value === '—') return false;
-  return value === 'true' || value === 'Tak' || value === 'Yes' || value === '1';
-}
-
 function resolveStatusText(record: DpdRecord, tableColumns?: TableColumn[]): string {
   const decCol = tableColumns?.find((c) => c.key === 'decision');
   const status = decCol ? displayField(record, decCol) : pickField(record, 'decision');
   return status && status !== '—' ? status : '';
 }
 
+/** Fraud only when explicitly named — FraudFlag=true means „anomalia po analizie”, not fraud. */
 export function isFraudCase(record: DpdRecord, statusText?: string): boolean {
   const status = statusText ?? resolveStatusText(record);
-  const fraudFlag = pickField(record, 'fraudFlag');
-  const riskLevel = pickField(record, 'riskLevel');
-  const anomaly = pickField(record, 'anomalyReason');
+  if (/fraud|oszust/i.test(status)) return true;
 
-  if (isTruthyFlag(fraudFlag) || /fraud/i.test(fraudFlag)) return true;
-  if (/fraud/i.test(status)) return true;
-  if (anomaly && anomaly !== '—' && /fraud/i.test(anomaly)) return true;
-  if (riskLevel && riskLevel !== '—' && /fraud|wysok|high|critical/i.test(riskLevel)) return true;
+  const fraudFlag = pickField(record, 'fraudFlag');
+  if (fraudFlag && fraudFlag !== '—' && /fraud|oszust/i.test(fraudFlag)) return true;
+
+  const anomaly = pickField(record, 'anomalyReason');
+  if (anomaly && anomaly !== '—' && /fraud|oszust/i.test(anomaly)) return true;
+
   return false;
+}
+
+function isFinalManagerDecision(statusText: string): boolean {
+  return /approv|zatwier|reject|odrzu/i.test(statusText);
 }
 
 export function classifyCaseStatus(
@@ -102,7 +102,8 @@ export function getCaseStatusFromRecord(
   tableColumns?: TableColumn[],
 ): CaseStatusInfo {
   const statusText = resolveStatusText(record, tableColumns);
-  const fraud = isFraudCase(record, statusText);
+  const fraud =
+    !isFinalManagerDecision(statusText) && isFraudCase(record, statusText);
   return classifyCaseStatus(statusText, { fraud });
 }
 

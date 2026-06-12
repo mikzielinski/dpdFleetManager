@@ -266,7 +266,7 @@ export async function updateRecordStatus(
   const entities = new Entities(sdk);
   const patch: Record<string, unknown> = { Status: status };
   if (managerNote?.trim()) {
-    patch.FraudFlag = 'true';
+    patch.Comments = managerNote.trim();
   }
   await entities.updateRecordById(DPD_POC_ENTITY_ID, recordId, patch, { expansionLevel: 1 });
 }

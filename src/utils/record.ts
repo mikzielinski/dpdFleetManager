@@ -58,6 +58,7 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
     'GrossPrice',
     'grossPrice',
   ],
+  /** W DF FraudFlag to często boolean anomalii po analizie (wyświetlane jako „Anomalia”). */
   anomalyReason: ['AnomalyReason', 'anomalyReason', 'FraudFlag', 'fraudFlag'],
   comments: ['Comments', 'comments', 'ManagerComment', 'managerComment'],
 };
