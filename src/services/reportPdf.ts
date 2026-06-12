@@ -8,6 +8,13 @@ import type { VehicleCatalogItem } from './vehicleCatalog';
 import type { CompanyCatalogItem } from './companyCatalog';
 import { BRAND, BRAND_RGB } from '../brand';
 
+const REPORT = {
+  costsTotal: 'Suma kosztów rozliczeń',
+  claimsCount: 'Liczba rozliczeń',
+  analyzedCount: 'Przeanalizowane rozliczenia',
+  fleetRegistry: 'Rejestr rozliczeń kosztów floty',
+} as const;
+
 function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
   doc.setFillColor(...BRAND_RGB.indigo);
   doc.rect(0, 0, 210, 28, 'F');
@@ -29,7 +36,23 @@ function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
   doc.text(`Wygenerowano: ${new Date().toLocaleString('pl-PL')}`, 14, 51);
 }
 
+function addBrandFooter(doc: jsPDF) {
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...BRAND_RGB.gray);
+    doc.text(
+      `${BRAND.name} · ${BRAND.productTitle} · strona ${i}/${pageCount}`,
+      14,
+      doc.internal.pageSize.getHeight() - 8,
+    );
+  }
+}
+
 function saveDoc(doc: jsPDF, filename: string) {
+  addBrandFooter(doc);
   doc.save(filename);
 }
 
@@ -62,10 +85,10 @@ export function downloadVehicleReportPdf(opts: {
     startY: y,
     head: [['Metryka', 'Wartość']],
     body: [
-      ['Suma kosztów (POC)', `${stats.totalCost.toFixed(2)} PLN`],
-      ['Liczba rozliczeń', String(stats.claimCount)],
+      [REPORT.costsTotal, `${stats.totalCost.toFixed(2)} PLN`],
+      [REPORT.claimsCount, String(stats.claimCount)],
       ['Średni koszt', `${stats.avgCost.toFixed(2)} PLN`],
-      ['Oznaczenia / fraud', String(stats.flaggedCount)],
+      [REPORT.analyzedCount, String(stats.flaggedCount)],
       ['Przebieg', compliance.mileageKm != null ? `${compliance.mileageKm.toLocaleString('pl-PL')} km` : '—'],
       ['Badanie techniczne do', compliance.inspectionValidUntil ?? '—'],
       ['Status badania', compliance.inspectionStatus],
@@ -167,9 +190,9 @@ export function downloadCompanyReportPdf(opts: {
     body: [
       ['Region', company.areaLabel || '—'],
       ['Pojazdy we flocie', String(company.vehicleCount)],
-      ['Suma kosztów POC', `${stats.totalCost.toFixed(2)} PLN`],
-      ['Rozliczenia', String(stats.claimCount)],
-      ['Oznaczenia / fraud', String(stats.flaggedCount)],
+      [REPORT.costsTotal, `${stats.totalCost.toFixed(2)} PLN`],
+      [REPORT.claimsCount, String(stats.claimCount)],
+      [REPORT.analyzedCount, String(stats.flaggedCount)],
     ],
     headStyles: { fillColor: BRAND_RGB.indigo, textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
@@ -221,17 +244,17 @@ export function downloadFleetSummaryPdf(opts: {
   companyCount: number;
 }) {
   const doc = new jsPDF();
-  addBrandHeader(doc, 'Podsumowanie floty', 'Rejestr rozliczeń DPD_POC');
+  addBrandHeader(doc, 'Podsumowanie floty', REPORT.fleetRegistry);
 
   autoTable(doc, {
     startY: 58,
     head: [['Metryka', 'Wartość']],
     body: [
-      ['Pojazdy B2B', String(opts.vehicleCount)],
+      ['Pojazdy we flocie', String(opts.vehicleCount)],
       ['Firmy kurierskie', String(opts.companyCount)],
-      ['Rozliczenia POC', String(opts.stats.claimCount)],
-      ['Suma kosztów', `${opts.stats.totalCost.toFixed(2)} PLN`],
-      ['Oznaczenia / fraud', String(opts.stats.flaggedCount)],
+      [REPORT.claimsCount, String(opts.stats.claimCount)],
+      [REPORT.costsTotal, `${opts.stats.totalCost.toFixed(2)} PLN`],
+      [REPORT.analyzedCount, String(opts.stats.flaggedCount)],
     ],
     headStyles: { fillColor: BRAND_RGB.indigo, textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
