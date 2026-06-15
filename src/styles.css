@@ -617,6 +617,93 @@ tbody tr:hover {
   border-radius: 14px;
 }
 
+.driver-review-banner,
+.driver-corrected-banner {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.driver-review-banner {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  color: #6d4c00;
+}
+
+.driver-corrected-banner {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #1b5e20;
+}
+
+.driver-review-banner p,
+.driver-corrected-banner p {
+  margin: 6px 0 0;
+}
+
+.driver-review-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-weight: 600;
+  color: #e87722;
+}
+
+.driver-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 8px;
+}
+
+.driver-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #a5d6a7;
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.driver-alert p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.driver-alert-time {
+  font-size: 12px;
+  color: #2e7d32;
+}
+
+.row-awaiting-driver {
+  background: #fff8e1 !important;
+}
+
+.row-driver-corrected {
+  background: #e8f5e9 !important;
+}
+
+.status-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-chip--action {
+  background: #ffe082;
+  color: #6d4c00;
+}
+
+.status-chip--corrected {
+  background: #a5d6a7;
+  color: #1b5e20;
+}
+
 .action-buttons {
   display: flex;
   gap: 10px;

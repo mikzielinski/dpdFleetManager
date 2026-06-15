@@ -2,6 +2,10 @@ import { Entities, ChoiceSets } from '@uipath/uipath-typescript/entities';
 import type { EntityGetResponse } from '@uipath/uipath-typescript/entities';
 import type { UiPath, PaginationCursor } from '@uipath/uipath-typescript/core';
 import {
+  CORRECTION_REQUEST_STATUS,
+  DRIVER_CORRECTED_STATUS,
+  DRIVER_NOTIFICATION_CLOSED,
+  DRIVER_NOTIFICATION_OPEN,
   DPD_POC_ENTITY_ID,
   DPD_VEHICLE_FLAGS_ENTITY_ID,
   INVOICE_FILE_FIELD_CANDIDATES,
@@ -255,9 +259,62 @@ export async function updateRecordStatus(
   const entities = new Entities(sdk);
   const patch: Record<string, unknown> = { Status: status };
   if (managerNote?.trim()) {
-    patch.FraudFlag = 'true';
+    patch.FleetManagerNote = managerNote.trim();
+    patch.Comments = managerNote.trim();
   }
   await entities.updateRecordById(DPD_POC_ENTITY_ID, recordId, patch, { expansionLevel: 1 });
+}
+
+/** Ask driver to correct invoice — sets review mode fields consumed by Driver App. */
+export async function requestInvoiceCorrection(
+  sdk: UiPath,
+  recordId: string,
+  message: string,
+): Promise<void> {
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    return;
+  }
+
+  const entities = new Entities(sdk);
+  const now = new Date().toISOString();
+  const note = message.trim();
+  await entities.updateRecordById(
+    DPD_POC_ENTITY_ID,
+    recordId,
+    {
+      Status: CORRECTION_REQUEST_STATUS,
+      FleetManagerNote: note,
+      DriverNotificationMessage: note,
+      DriverNotificationStatus: DRIVER_NOTIFICATION_OPEN,
+      CorrectionRequestedAt: now,
+    },
+    { expansionLevel: 1 },
+  );
+}
+
+/** Mark record as corrected by driver — easy to filter in claims register. */
+export async function markDriverCorrectionReceived(
+  sdk: UiPath,
+  recordId: string,
+  resolvedAt?: string,
+): Promise<void> {
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    return;
+  }
+
+  const entities = new Entities(sdk);
+  await entities.updateRecordById(
+    DPD_POC_ENTITY_ID,
+    recordId,
+    {
+      Status: DRIVER_CORRECTED_STATUS,
+      DriverNotificationStatus: DRIVER_NOTIFICATION_CLOSED,
+      CorrectionResolvedAt: resolvedAt ?? new Date().toISOString(),
+    },
+    { expansionLevel: 1 },
+  );
 }
 
 export async function downloadInvoiceBlob(

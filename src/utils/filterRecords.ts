@@ -37,6 +37,7 @@ export function getRecordNumericAmount(r: DpdRecord): number | null {
 export function isLikelyFlagged(r: DpdRecord, tableColumns?: TableColumn[]): boolean {
   const decCol = tableColumns?.find((c) => c.key === 'decision');
   const status = decCol ? displayField(r, decCol) : pickField(r, 'decision', 'Status', 'status');
+  if (status && status !== '—' && /action required|driver corrected/i.test(status)) return true;
   if (status && status !== '—' && /flagged|flag|anomal/i.test(status)) return true;
 
   const ft = pickField(r, 'flagType');

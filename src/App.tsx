@@ -6,6 +6,7 @@ import {
   DETAIL_FIELD_KEYS,
   DETAIL_FIELD_LABELS,
   DETAIL_OPTIONAL_FIELDS,
+  DEFAULT_INVOICE_REQUEST_MESSAGE,
   ORCHESTRATOR_RELEASE_NAME,
   PAGE_SIZE,
   TABLE_COLUMNS,
@@ -20,6 +21,8 @@ import {
   fetchVehicleFlagForCostRecord,
   fetchVehicleFlagHistory,
   loadEntityContext,
+  markDriverCorrectionReceived,
+  requestInvoiceCorrection,
   translateRecord,
   updateRecordStatus,
   type EntityContext,
@@ -74,6 +77,13 @@ import {
   type VehicleCatalogItem,
 } from './services/vehicleCatalog';
 import { computeHealthScore } from './utils/healthScore';
+import {
+  buildDriverCorrectionUrl,
+  isAwaitingDriverCorrection,
+  isDriverCorrected,
+  isTrustedDriverMessageOrigin,
+  parseDriverCorrectionResolved,
+} from './utils/driverIntegration';
 import { extractVehicleCompliance } from './utils/vehicleCompliance';
 import {
   DEFAULT_COMPANY_FILTERS,
@@ -133,6 +143,9 @@ export default function App() {
   const [recordTotal, setRecordTotal] = useState<number | null>(null);
   const [managerComment, setManagerComment] = useState('');
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [driverAlerts, setDriverAlerts] = useState<
+    Array<{ id: string; recordId: string; message: string; at: string }>
+  >([]);
 
   const [vehicleHistory, setVehicleHistory] = useState<VehicleFlagHistoryItem[]>([]);
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
@@ -766,6 +779,7 @@ export default function App() {
     try {
       await updateRecordStatus(sdk, activeId, status, managerComment);
       setStatusMsg(`Zapisano decyzję: ${status}`);
+      setManagerComment('');
       await loadPage(undefined, true);
       await selectRecord(activeId);
     } catch (e) {
@@ -774,6 +788,62 @@ export default function App() {
       setDecisionBusy(false);
     }
   };
+
+  const submitInvoiceRequest = async () => {
+    if (!activeId || decisionBusy) return;
+    const message = managerComment.trim() || DEFAULT_INVOICE_REQUEST_MESSAGE;
+    setDecisionBusy(true);
+    setStatusMsg(null);
+    try {
+      await requestInvoiceCorrection(sdk, activeId, message);
+      setStatusMsg(
+        `Wysłano prośbę o poprawę faktury. Kierowca zobaczy powiadomienie w Driver App (status: Action Required).`,
+      );
+      setManagerComment('');
+      await loadPage(undefined, true);
+      await selectRecord(activeId);
+    } catch (e) {
+      setStatusMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDecisionBusy(false);
+    }
+  };
+
+  const handleDriverCorrectionResolved = useCallback(
+    async (recordId: string, closedAt?: string) => {
+      try {
+        await markDriverCorrectionReceived(sdk, recordId, closedAt);
+        const alertId = `${recordId}-${Date.now()}`;
+        setDriverAlerts((prev) => [
+          {
+            id: alertId,
+            recordId,
+            message: `Kierowca poprawił zgłoszenie ${recordId.slice(0, 8)}… — status: Driver Corrected`,
+            at: new Date().toLocaleString('pl-PL'),
+          },
+          ...prev.slice(0, 4),
+        ]);
+        setStatusMsg(`Kierowca zaktualizował zgłoszenie — oznaczono jako „Driver Corrected”.`);
+        await loadPage(undefined, true);
+        await selectRecord(recordId);
+      } catch (e) {
+        setStatusMsg(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [sdk, loadPage, selectRecord],
+  );
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!isTrustedDriverMessageOrigin(event.origin)) return;
+      const resolved = parseDriverCorrectionResolved(event.data);
+      if (!resolved) return;
+      void handleDriverCorrectionResolved(resolved.recordId, resolved.closedAt);
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [handleDriverCorrectionResolved]);
 
   if (!BYPASS_AUTH && !isAuthenticated) {
     return (
@@ -924,6 +994,30 @@ export default function App() {
 
       {statusMsg && !activeRun && <div className="info-banner">{statusMsg}</div>}
 
+      {driverAlerts.length > 0 && (
+        <div className="driver-alerts" aria-live="polite">
+          {driverAlerts.map((alert) => (
+            <div key={alert.id} className="driver-alert driver-alert--corrected">
+              <div>
+                <strong>Powiadomienie od kierowcy</strong>
+                <p>{alert.message}</p>
+                <span className="driver-alert-time">{alert.at}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  void selectRecord(alert.recordId);
+                  setDriverAlerts((prev) => prev.filter((item) => item.id !== alert.id));
+                }}
+              >
+                Pokaż zgłoszenie
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="main-workspace">
         {mainSection === 'claims' ? (
           <div className="layout master-detail-layout">
@@ -985,10 +1079,19 @@ export default function App() {
                       displayRecords.map((r) => {
                         const id = recordId(r);
                         const selected = id === activeId;
+                        const awaitingDriver = isAwaitingDriverCorrection(r);
+                        const driverCorrected = isDriverCorrected(r);
+                        const rowClass = [
+                          selected ? 'row-active' : '',
+                          awaitingDriver ? 'row-awaiting-driver' : '',
+                          driverCorrected ? 'row-driver-corrected' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ');
                         return (
                           <tr
                             key={id}
-                            className={selected ? 'row-active' : ''}
+                            className={rowClass}
                             onClick={() => onRowClick(r)}
                           >
                             <td onClick={(e) => e.stopPropagation()}>
@@ -999,7 +1102,23 @@ export default function App() {
                               />
                             </td>
                             {tableColumns.map((c) => (
-                              <td key={c.key}>{displayField(r, c)}</td>
+                              <td key={c.key}>
+                                {c.key === 'decision' ? (
+                                  <span
+                                    className={[
+                                      'status-chip',
+                                      awaitingDriver ? 'status-chip--action' : '',
+                                      driverCorrected ? 'status-chip--corrected' : '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' ')}
+                                  >
+                                    {displayField(r, c)}
+                                  </span>
+                                ) : (
+                                  displayField(r, c)
+                                )}
+                              </td>
                             ))}
                           </tr>
                         );
@@ -1115,10 +1234,41 @@ export default function App() {
 
                   <div className="decision-hint">
                     <p className="section-sub">Decyzja managera</p>
+                    {activeRecord && isAwaitingDriverCorrection(activeRecord) && (
+                      <div className="driver-review-banner">
+                        <strong>Oczekuje na kierowcę</strong>
+                        <p>
+                          Wysłano prośbę o poprawę faktury. Kierowca zobaczy powiadomienie w Driver
+                          App.
+                        </p>
+                        <a
+                          className="driver-review-link"
+                          href={buildDriverCorrectionUrl(
+                            activeId ?? '',
+                            pickField(activeRecord, 'fleetManagerNote', 'FleetManagerNote') !== '—'
+                              ? pickField(activeRecord, 'fleetManagerNote', 'FleetManagerNote')
+                              : DEFAULT_INVOICE_REQUEST_MESSAGE,
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Otwórz Driver App dla tego zgłoszenia
+                        </a>
+                      </div>
+                    )}
+                    {activeRecord && isDriverCorrected(activeRecord) && (
+                      <div className="driver-corrected-banner">
+                        <strong>Poprawione przez kierowcę</strong>
+                        <p>
+                          Kierowca zaktualizował zgłoszenie — zweryfikuj fakturę i zatwierdź lub
+                          odrzuć.
+                        </p>
+                      </div>
+                    )}
                     <textarea
                       className="manager-comment"
                       rows={3}
-                      placeholder="Komentarz do decyzji (opcjonalnie)…"
+                      placeholder="Wiadomość do kierowcy przy „Zapytaj o fakturę” (opcjonalnie)…"
                       value={managerComment}
                       onChange={(e) => setManagerComment(e.target.value)}
                     />
@@ -1143,9 +1293,10 @@ export default function App() {
                         type="button"
                         className="btn btn-clarify"
                         disabled={decisionBusy || globalBusy}
-                        onClick={() => void submitManagerDecision('Clarification')}
+                        onClick={() => void submitInvoiceRequest()}
+                        title={DEFAULT_INVOICE_REQUEST_MESSAGE}
                       >
-                        ? Wyjaśnij
+                        📄 Zapytaj o fakturę
                       </button>
                       <button
                         type="button"
@@ -1157,8 +1308,10 @@ export default function App() {
                       </button>
                     </div>
                     <p className="hint-small">
-                      Zatwierdź/Odrzuć zapisuje Status w encji DPD_POC. „Analizuj” uruchamia{' '}
-                      {ORCHESTRATOR_RELEASE_NAME} w folderze Shared/DPDDataInvestigator.
+                      Zatwierdź/Odrzuć zapisuje Status w DPD_POC. „Zapytaj o fakturę” ustawia{' '}
+                      <strong>Action Required</strong> i wysyła wiadomość do Driver App
+                      {managerComment.trim() ? ' (Twój komentarz)' : ' (domyślny tekst)'}.
+                      Po poprawce kierowca pojawi się jako <strong>Driver Corrected</strong>.
                     </p>
                   </div>
                 </>

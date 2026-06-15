@@ -30,6 +30,24 @@ export const MAESTRO_FOLDER_PATH = 'Shared/DPDDataInvestigator';
 /** Start event input for Agentic Process BPMN */
 export const MAESTRO_INPUT_RECORD_ARG = 'InRecord_Id';
 
+/** Driver app hosted URL (staging) — for opening correction flow */
+export const DRIVER_APP_HOSTED_URL =
+  import.meta.env.VITE_DRIVER_APP_URL?.trim() ||
+  'https://mzpocevylrxu.staging.uipath.host/dpddriver/';
+
+/** Fleet Manager → Driver: review / invoice correction request */
+export const CORRECTION_REQUEST_STATUS = 'Action Required';
+
+/** Driver → Fleet Manager: submission corrected, awaiting manager review */
+export const DRIVER_CORRECTED_STATUS = 'Driver Corrected';
+
+export const DRIVER_NOTIFICATION_OPEN = 'Open';
+export const DRIVER_NOTIFICATION_CLOSED = 'Closed';
+
+/** Default message when manager does not type a comment */
+export const DEFAULT_INVOICE_REQUEST_MESSAGE =
+  'Proszę o poprawę faktury — dołącz czytelny dokument zgodny z zadeklarowaną usługą i numerem rejestracyjnym pojazdu.';
+
 export const PAGE_SIZE = 25;
 
 export interface TableColumn {

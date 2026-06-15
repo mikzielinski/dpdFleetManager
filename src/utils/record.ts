@@ -18,6 +18,15 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   combinedScore: ['CombinedScore', 'combinedScore'],
   flagType: ['FlagType', 'flagType'],
   fleetManagerNote: ['FleetManagerNote', 'fleetManagerNote'],
+  driverNotificationStatus: [
+    'DriverNotificationStatus',
+    'driverNotificationStatus',
+    'NotificationStatus',
+    'notificationStatus',
+  ],
+  driverNotificationMessage: ['DriverNotificationMessage', 'driverNotificationMessage'],
+  correctionRequestedAt: ['CorrectionRequestedAt', 'correctionRequestedAt'],
+  correctionResolvedAt: ['CorrectionResolvedAt', 'correctionResolvedAt'],
   fraudFlag: ['FraudFlag', 'fraudFlag'],
   invoiceFileName: ['invoiceFileName', 'InvoiceFileName', 'Invoice File', 'InvoiceFile'],
   date: [
