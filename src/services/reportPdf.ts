@@ -7,27 +7,28 @@ import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 import type { VehicleCatalogItem } from './vehicleCatalog';
 import type { CompanyCatalogItem } from './companyCatalog';
 
-const DPD_RED: [number, number, number] = [220, 0, 50];
-const DPD_DARK: [number, number, number] = [59, 59, 59];
-const DPD_GRAY: [number, number, number] = [120, 120, 120];
+const BRAND_NAVY: [number, number, number] = [26, 27, 58];
+const BRAND_ORANGE: [number, number, number] = [232, 119, 34];
+const BRAND_DARK: [number, number, number] = [26, 26, 26];
+const BRAND_GRAY: [number, number, number] = [120, 120, 120];
 
-function addDpdHeader(doc: jsPDF, title: string, subtitle: string) {
-  doc.setFillColor(...DPD_RED);
+function addBrandHeader(doc: jsPDF, title: string, subtitle: string) {
+  doc.setFillColor(...BRAND_NAVY);
   doc.rect(0, 0, 210, 28, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('DPD', 14, 14);
+  doc.text('Xelto EXPRESS', 14, 14);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text('Fleet Manager — koszty kierowców', 14, 21);
-  doc.setTextColor(...DPD_DARK);
+  doc.text('Fleet Manager — weryfikacja kosztów', 14, 21);
+  doc.setTextColor(...BRAND_DARK);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(title, 14, 38);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...DPD_GRAY);
+  doc.setTextColor(...BRAND_GRAY);
   doc.text(subtitle, 14, 45);
   doc.text(`Wygenerowano: ${new Date().toLocaleString('pl-PL')}`, 14, 51);
 }
@@ -44,14 +45,14 @@ export function downloadVehicleReportPdf(opts: {
 }) {
   const { vehicle, stats, health, compliance } = opts;
   const doc = new jsPDF();
-  addDpdHeader(
+  addBrandHeader(
     doc,
     `Raport pojazdu ${vehicle.registration}`,
     `${vehicle.companyLabel || '—'} · ${vehicle.areaLabel || '—'}`,
   );
 
   let y = 58;
-  doc.setTextColor(...DPD_DARK);
+  doc.setTextColor(...BRAND_DARK);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.text(`Health Score: ${health.score}/100 (${health.grade})`, 14, y);
@@ -74,7 +75,7 @@ export function downloadVehicleReportPdf(opts: {
       ['Status badania', compliance.inspectionStatus],
     ],
     theme: 'grid',
-    headStyles: { fillColor: DPD_RED, textColor: [255, 255, 255] },
+    headStyles: { fillColor: BRAND_ORANGE, textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
@@ -96,7 +97,7 @@ export function downloadVehicleReportPdf(opts: {
         c.total.toFixed(2),
       ]),
       theme: 'striped',
-      headStyles: { fillColor: DPD_DARK },
+      headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
@@ -112,7 +113,7 @@ export function downloadVehicleReportPdf(opts: {
       startY: y,
       head: [['Typ', 'Ważna do', 'Status']],
       body: compliance.policies.map((p) => [p.type, p.validUntil ?? '—', p.status]),
-      headStyles: { fillColor: DPD_DARK },
+      headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
@@ -128,7 +129,7 @@ export function downloadVehicleReportPdf(opts: {
       startY: y,
       head: [['Czynnik', 'Wpływ', 'Szczegóły']],
       body: health.factors.map((f) => [f.label, String(f.impact), f.detail]),
-      headStyles: { fillColor: DPD_DARK },
+      headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
@@ -136,12 +137,12 @@ export function downloadVehicleReportPdf(opts: {
 
   if (compliance.complianceIssues.length) {
     const fy = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 250;
-    doc.setTextColor(...DPD_RED);
+    doc.setTextColor(...BRAND_ORANGE);
     doc.setFontSize(9);
     doc.text('Nieprawidłowości: ' + compliance.complianceIssues.join('; '), 14, fy + 10);
   }
 
-  saveDoc(doc, `DPD_Pojazd_${vehicle.registration.replace(/\s/g, '_')}.pdf`);
+  saveDoc(doc, `Xelto_Pojazd_${vehicle.registration.replace(/\s/g, '_')}.pdf`);
 }
 
 export function downloadCompanyReportPdf(opts: {
@@ -152,7 +153,7 @@ export function downloadCompanyReportPdf(opts: {
 }) {
   const { company, stats, health, vehicles } = opts;
   const doc = new jsPDF();
-  addDpdHeader(
+  addBrandHeader(
     doc,
     `Raport firmy B2B`,
     company.name,
@@ -174,7 +175,7 @@ export function downloadCompanyReportPdf(opts: {
       ['Rozliczenia', String(stats.claimCount)],
       ['Oznaczenia / fraud', String(stats.flaggedCount)],
     ],
-    headStyles: { fillColor: DPD_RED, textColor: [255, 255, 255] },
+    headStyles: { fillColor: BRAND_ORANGE, textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
@@ -187,7 +188,7 @@ export function downloadCompanyReportPdf(opts: {
       startY: y,
       head: [['Kategoria', 'Liczba', 'Suma PLN']],
       body: stats.byCategory.map((c) => [c.category, String(c.count), c.total.toFixed(2)]),
-      headStyles: { fillColor: DPD_DARK },
+      headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
@@ -209,13 +210,13 @@ export function downloadCompanyReportPdf(opts: {
         v.healthGrade ? `${v.healthScore ?? '—'} (${v.healthGrade})` : '—',
         v.totalCost != null ? v.totalCost.toFixed(2) : '—',
       ]),
-      headStyles: { fillColor: DPD_DARK },
+      headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
     });
   }
 
-  saveDoc(doc, `DPD_Firma_${company.name.slice(0, 30).replace(/[^\w]/g, '_')}.pdf`);
+  saveDoc(doc, `Xelto_Firma_${company.name.slice(0, 30).replace(/[^\w]/g, '_')}.pdf`);
 }
 
 export function downloadFleetSummaryPdf(opts: {
@@ -224,7 +225,7 @@ export function downloadFleetSummaryPdf(opts: {
   companyCount: number;
 }) {
   const doc = new jsPDF();
-  addDpdHeader(doc, 'Podsumowanie floty', 'Rejestr rozliczeń DPD_POC');
+  addBrandHeader(doc, 'Podsumowanie floty', 'Rejestr rozliczeń DPD_POC');
 
   autoTable(doc, {
     startY: 58,
@@ -236,7 +237,7 @@ export function downloadFleetSummaryPdf(opts: {
       ['Suma kosztów', `${opts.stats.totalCost.toFixed(2)} PLN`],
       ['Oznaczenia / fraud', String(opts.stats.flaggedCount)],
     ],
-    headStyles: { fillColor: DPD_RED, textColor: [255, 255, 255] },
+    headStyles: { fillColor: BRAND_ORANGE, textColor: [255, 255, 255] },
     styles: { fontSize: 9 },
     margin: { left: 14, right: 14 },
   });
@@ -249,10 +250,10 @@ export function downloadFleetSummaryPdf(opts: {
       const meta = SERVICE_CATEGORIES.find((x) => x.id === c.category);
       return [meta?.label ?? c.category, String(c.count), c.total.toFixed(2)];
     }),
-    headStyles: { fillColor: DPD_DARK },
+    headStyles: { fillColor: BRAND_DARK },
     styles: { fontSize: 8 },
     margin: { left: 14, right: 14 },
   });
 
-  saveDoc(doc, `DPD_Podsumowanie_floty.pdf`);
+  saveDoc(doc, `Xelto_Podsumowanie_floty.pdf`);
 }

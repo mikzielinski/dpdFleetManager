@@ -6,11 +6,20 @@
   padding: 0;
 }
 
+:root {
+  --brand-navy: #1a1b3a;
+  --brand-orange: #e87722;
+  --brand-orange-dark: #c96510;
+  --brand-navy-muted: #2a2b5a;
+  --brand-surface: #f0f2f5;
+  --brand-text: #1a1a1a;
+}
+
 body {
   font-family: 'Noto Sans', sans-serif;
   font-size: 14px;
-  background: #f4f4f2;
-  color: #333;
+  background: var(--brand-surface);
+  color: var(--brand-text);
   min-height: 100vh;
 }
 
@@ -21,14 +30,15 @@ body {
 }
 
 .header {
-  background: #dc0032;
+  background: var(--brand-navy);
   color: #fff;
-  padding: 12px 20px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  box-shadow: 0 2px 8px rgba(26, 27, 58, 0.25);
 }
 
 .header-left {
@@ -37,10 +47,30 @@ body {
   gap: 12px;
 }
 
-.dpd-logo {
+.brand-logo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-weight: 900;
-  font-size: 26px;
-  letter-spacing: 2px;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.brand-logo-express {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 2.5px;
+  opacity: 0.92;
+}
+
+.auth-card .brand-logo {
+  color: var(--brand-navy);
+  justify-content: center;
+}
+
+.dpd-logo {
+  display: none;
 }
 
 .header-sep {
@@ -49,8 +79,31 @@ body {
 }
 
 .header-title {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
+}
+
+.header-sub {
+  font-size: 12px;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-badge {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .header-actions {
@@ -165,13 +218,13 @@ body {
 }
 
 .main-nav-btn:hover {
-  color: #dc0032;
+  color: #e87722;
   background: #fafafa;
 }
 
 .main-nav-btn-active {
-  color: #dc0032;
-  border-bottom-color: #dc0032;
+  color: #e87722;
+  border-bottom-color: #e87722;
   background: #fff;
 }
 
@@ -204,7 +257,7 @@ body {
 .btn-link-reset {
   background: none;
   border: none;
-  color: #dc0032;
+  color: #e87722;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -213,7 +266,7 @@ body {
 }
 
 .btn-link-reset:hover {
-  color: #a30025;
+  color: var(--brand-orange-dark);
 }
 
 .global-filter-controls {
@@ -389,11 +442,11 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: #faf6f6;
+  background: #f7f8fa;
 }
 
 .row-active {
-  background: #fde8e8 !important;
+  background: #fff3e8 !important;
 }
 
 .center {
@@ -481,7 +534,7 @@ tbody tr:hover {
 }
 
 .invoice-download-link {
-  color: #dc0032;
+  color: #e87722;
   font-weight: 600;
   text-decoration: none;
 }
@@ -529,7 +582,7 @@ tbody tr:hover {
 }
 
 .preview-error {
-  color: #dc0032;
+  color: #e87722;
 }
 
 .analysis-panel {
@@ -541,7 +594,7 @@ tbody tr:hover {
 .fraud-note {
   margin: 8px 0 14px;
   padding: 12px 16px;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid #e87722;
   border-radius: 6px;
   line-height: 1.55;
 }
@@ -731,7 +784,7 @@ tbody tr:hover {
 .case-history-card {
   background: #fff;
   border: 1px solid #ddd;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid #e87722;
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -782,13 +835,13 @@ tbody tr:hover {
 }
 
 .btn-primary {
-  background: #dc0032;
+  background: var(--brand-orange);
   color: #fff;
 }
 
 .btn-analyze {
   background: #fff;
-  color: #dc0032;
+  color: var(--brand-navy);
   border-color: #fff;
 }
 
@@ -804,7 +857,7 @@ tbody tr:hover {
 }
 
 .btn-reject {
-  background: #dc0032;
+  background: var(--brand-navy);
   color: #fff;
 }
 
@@ -914,7 +967,7 @@ tbody tr:hover {
 }
 
 .error-text {
-  color: #dc0032;
+  color: #e87722;
   margin: 8px 0;
   font-size: 13px;
 }
@@ -923,7 +976,7 @@ tbody tr:hover {
   width: 36px;
   height: 36px;
   border: 4px solid #e0e0e0;
-  border-top-color: #dc0032;
+  border-top-color: #e87722;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -942,12 +995,12 @@ tbody tr:hover {
 
 .main-nav-btn-report {
   margin-left: auto;
-  border-color: #dc0032;
-  color: #dc0032;
+  border-color: #e87722;
+  color: #e87722;
 }
 
 .main-nav-btn-report:hover {
-  background: #dc0032;
+  background: #e87722;
   color: #fff;
 }
 
@@ -978,7 +1031,7 @@ tbody tr:hover {
   gap: 12px;
   padding: 12px;
   background: #fff;
-  border-left: 4px solid #dc0032;
+  border-left: 4px solid #e87722;
   border-radius: 4px;
   margin-bottom: 14px;
 }
@@ -1016,7 +1069,7 @@ tbody tr:hover {
   color: #333;
 }
 .health-grade-f {
-  background: #dc0032;
+  background: #e87722;
 }
 
 .health-score-value {
@@ -1050,7 +1103,7 @@ tbody tr:hover {
 }
 
 .health-factor-impact {
-  color: #dc0032;
+  color: #e87722;
   font-weight: 600;
 }
 
@@ -1143,7 +1196,7 @@ tbody tr:hover {
 }
 
 .compliance-status-expired {
-  color: #dc0032;
+  color: #e87722;
   font-weight: 600;
 }
 

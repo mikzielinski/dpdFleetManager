@@ -84,7 +84,7 @@ export function FleetStatsPanel({ stats, health, title = 'Statystyki', onExportP
                   <div className="category-bar-track">
                     <div
                       className="category-bar-fill"
-                      style={{ width: `${pct}%`, backgroundColor: meta?.color ?? '#dc0032' }}
+                      style={{ width: `${pct}%`, backgroundColor: meta?.color ?? '#e87722' }}
                     />
                   </div>
                   <span className="category-bar-meta">

@@ -862,9 +862,14 @@ export default function App() {
     <div className="app-shell">
       <header className="header">
         <div className="header-left">
-          <div className="dpd-logo">DPD</div>
+          <div className="brand-logo">
+            Xelto <span className="brand-logo-express">EXPRESS</span>
+          </div>
           <span className="header-sep">|</span>
-          <span className="header-title">Fleet Manager — koszty kierowców</span>
+          <div className="header-titles">
+            <span className="header-title">Fleet Manager</span>
+            <span className="header-sub">Weryfikacja kosztów kierowców</span>
+          </div>
           <span className="header-version" title="Wersja aplikacji">
             v{import.meta.env.VITE_APP_VERSION ?? '?'}
           </span>

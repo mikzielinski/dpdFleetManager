@@ -207,7 +207,9 @@ function AuthConfigScreen({ result }: { result: Extract<AuthConfigResult, { ok: 
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
+        <div className="brand-logo">
+          Xelto <span className="brand-logo-express">EXPRESS</span>
+        </div>
         <h1>Fleet Manager — konfiguracja OAuth</h1>
         <p className="config-lead">{result.message}</p>
 
@@ -268,7 +270,9 @@ export function AuthLoginScreen({
   return (
     <div className="auth-screen">
       <div className="auth-card config-card">
-        <div className="dpd-logo">DPD</div>
+        <div className="brand-logo">
+          Xelto <span className="brand-logo-express">EXPRESS</span>
+        </div>
         <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : 'Fleet Manager'}</h1>
 
         {showOAuthFailure ? (

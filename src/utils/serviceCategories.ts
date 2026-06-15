@@ -18,7 +18,7 @@ export interface ServiceCategoryMeta {
 export const SERVICE_CATEGORIES: ServiceCategoryMeta[] = [
   { id: 'Paliwo', label: 'Paliwo', color: '#e85d04' },
   { id: 'Opłaty drogowe', label: 'Opłaty drogowe', color: '#7b2cbf' },
-  { id: 'Serwis / naprawa', label: 'Serwis / naprawa', color: '#dc0032' },
+  { id: 'Serwis / naprawa', label: 'Serwis / naprawa', color: '#e87722' },
   { id: 'Przegląd techniczny', label: 'Przegląd techniczny', color: '#0077b6' },
   { id: 'Ubezpieczenie', label: 'Ubezpieczenie', color: '#2a9d8f' },
   { id: 'Myjnia / parking', label: 'Myjnia / parking', color: '#6c757d' },

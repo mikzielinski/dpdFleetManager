@@ -425,7 +425,7 @@ export function riskColor(level: string | undefined): string {
     case 'critical':
       return '#8b0000';
     case 'high':
-      return '#dc0032';
+      return '#e87722';
     case 'medium':
       return '#e87722';
     case 'low':
