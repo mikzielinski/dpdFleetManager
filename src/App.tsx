@@ -4,9 +4,7 @@ import { AuthLoginScreen, BYPASS_AUTH, useAuth } from './hooks/useAuth';
 import { usePolling } from './hooks/usePolling';
 import {
   DETAIL_FIELD_KEYS,
-  DETAIL_FIELD_LABELS,
   DETAIL_OPTIONAL_FIELDS,
-  DEFAULT_INVOICE_REQUEST_MESSAGE,
   ORCHESTRATOR_RELEASE_NAME,
   PAGE_SIZE,
   TABLE_COLUMNS,
@@ -20,6 +18,7 @@ import {
   fetchRecordsPage,
   fetchVehicleFlagForCostRecord,
   fetchVehicleFlagHistory,
+  formatDataFabricWriteError,
   loadEntityContext,
   markDriverCorrectionReceived,
   requestInvoiceCorrection,
@@ -32,6 +31,16 @@ import { CompaniesSection } from './components/CompaniesSection';
 import { CompliancePanel } from './components/CompliancePanel';
 import { FleetStatsPanel } from './components/FleetStatsPanel';
 import { GlobalFilterBar } from './components/GlobalFilterBar';
+import { LanguageSettings } from './components/LanguageSettings';
+import { LanguageSettingsCard } from './components/LanguageSettingsCard';
+import { InsightsSection } from './components/InsightsSection';
+import { SettingsSection } from './components/SettingsSection';
+import { useI18n } from './i18n/I18nProvider';
+import {
+  formatLocale,
+  localizedFieldLabel,
+  localizedTableColumns,
+} from './i18n/uiLabels';
 import {
   DEFAULT_CLAIMS_FILTERS,
   filterClaimRecords,
@@ -89,6 +98,8 @@ import {
   DEFAULT_COMPANY_FILTERS,
   type CompanyFilterState,
 } from './utils/companyFilters';
+import { analysisFromRecord } from './utils/analysisFromRecord';
+import { buildInsightRecords } from './utils/insightsEngine';
 import {
   findInvoiceFileField,
   normalizeRegistration,
@@ -104,6 +115,8 @@ import {
 } from './utils/detailRecord';
 
 export default function App() {
+  const { t, locale } = useI18n();
+  const fmt = formatLocale(locale);
   const {
     sdk,
     isAuthenticated,
@@ -152,7 +165,9 @@ export default function App() {
   const [vehicleHistoryError, setVehicleHistoryError] = useState<string | null>(null);
   const [activeVehicleFlag, setActiveVehicleFlag] = useState<VehicleFlagHistoryItem | null>(null);
 
-  const [mainSection, setMainSection] = useState<'claims' | 'vehicles' | 'companies'>('claims');
+  const [mainSection, setMainSection] = useState<
+    'claims' | 'vehicles' | 'companies' | 'dashboard' | 'insights' | 'settings'
+  >('claims');
   const [claimFilters, setClaimFilters] = useState<ClaimsFilterState>(DEFAULT_CLAIMS_FILTERS);
   const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>(DEFAULT_VEHICLE_FILTERS);
   const [vehicleCatalog, setVehicleCatalog] = useState<VehicleCatalogData | null>(null);
@@ -167,6 +182,11 @@ export default function App() {
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
   const tableColumns: TableColumn[] = ctx?.tableColumns ?? TABLE_COLUMNS;
+
+  const displayTableColumns = useMemo(
+    () => localizedTableColumns(tableColumns, t),
+    [tableColumns, t],
+  );
 
   const globalFilterActive = useMemo(
     () => needsFullDatasetFilters(claimFilters),
@@ -195,8 +215,8 @@ export default function App() {
       const v = col ? displayField(r, col) : pickField(r, 'serviceName');
       if (v && v !== '—') set.add(v);
     }
-    return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
-  }, [records, tableColumns]);
+    return [...set].sort((a, b) => a.localeCompare(b, locale));
+  }, [records, tableColumns, locale]);
 
   const decisionOptions = useMemo(() => {
     const col = tableColumns.find((c) => c.key === 'decision');
@@ -205,8 +225,8 @@ export default function App() {
       const v = col ? displayField(r, col) : pickField(r, 'decision');
       if (v && v !== '—') set.add(v);
     }
-    return [...set].sort((a, b) => a.localeCompare(b, 'pl'));
-  }, [records, tableColumns]);
+    return [...set].sort((a, b) => a.localeCompare(b, locale));
+  }, [records, tableColumns, locale]);
 
   const fleetMedianCost = useMemo(
     () => fleetMedianCostPerClaim(allPocCosts),
@@ -344,6 +364,21 @@ export default function App() {
     [allPocCosts, tableColumns],
   );
 
+  const fleetHealth = useMemo(
+    () =>
+      computeHealthScore({
+        stats: fleetStats,
+        complianceIssueCount: 0,
+        fleetMedianCostPerClaim: fleetMedianCost,
+      }),
+    [fleetStats, fleetMedianCost],
+  );
+
+  const insightRecords = useMemo(
+    () => buildInsightRecords(allPocCosts, tableColumns, fleetMedianCost),
+    [allPocCosts, tableColumns, fleetMedianCost],
+  );
+
   const activeVehicleCosts = useMemo(() => {
     if (!activeVehicle || !vehicleCatalog) return [];
     return matchCostsToVehicle(
@@ -437,7 +472,8 @@ export default function App() {
   }, [sdk, isAuthenticated]);
 
   useEffect(() => {
-    if (mainSection !== 'vehicles' || !isAuthenticated) return;
+    if (mainSection !== 'vehicles' && mainSection !== 'dashboard' && mainSection !== 'insights') return;
+    if (!isAuthenticated) return;
     if (vehicleCatalog || vehicleCatalogLoading) return;
     void loadVehicleTabData();
   }, [mainSection, isAuthenticated, vehicleCatalog, vehicleCatalogLoading, loadVehicleTabData]);
@@ -476,10 +512,12 @@ export default function App() {
   }, [sdk, isAuthenticated, vehicleCatalog]);
 
   useEffect(() => {
-    if (mainSection !== 'companies' || !isAuthenticated) return;
+    if (mainSection !== 'companies' && mainSection !== 'dashboard') return;
+    if (!isAuthenticated) return;
     if (companyCatalog || companyCatalogLoading) return;
+    if (mainSection === 'dashboard' && !vehicleCatalog) return;
     void loadCompanyTabData();
-  }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, loadCompanyTabData]);
+  }, [mainSection, isAuthenticated, companyCatalog, companyCatalogLoading, vehicleCatalog, loadCompanyTabData]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -498,7 +536,12 @@ export default function App() {
         } catch (e) {
           if (!cancelled) {
             setMaestroTarget(null);
-            setMaestroError(e instanceof Error ? e.message : String(e));
+            const msg = e instanceof Error ? e.message : String(e);
+            setMaestroError(
+              /authentication failed|insufficient_scope|401/i.test(msg)
+                ? `${msg} — wyloguj się i zaloguj ponownie (token musi mieć OR.Execution, OR.Jobs, OR.Folders.Read).`
+                : msg,
+            );
           }
         }
         await loadPage(undefined, true);
@@ -561,9 +604,7 @@ export default function App() {
           setInvoiceBlob(file.blob);
           setInvoiceMime(file.mime);
         } else if (!findInvoiceFileField(translated, ctxRef.current?.fileFields ?? [])) {
-          setInvoiceError(
-            'Nie znaleziono załącznika (pole Invoice File / InvoiceFile w Data Fabric).',
-          );
+          setInvoiceError(t('claims.invoiceMissing'));
         }
       } catch (e) {
         setInvoiceError(e instanceof Error ? e.message : String(e));
@@ -660,7 +701,7 @@ export default function App() {
     if (failures.length > 0) {
       setStatusMsg(`Błąd analizy: ${failures.join('; ')}`);
     } else {
-      setStatusMsg('Analiza uruchomiona — śledzenie postępu…');
+      setStatusMsg(t('claims.analysisStarted'));
     }
   };
 
@@ -693,15 +734,18 @@ export default function App() {
             : r,
         ),
       );
-      setStatusMsg('Analiza zakończona.');
+      setStatusMsg(t('claims.analysisDone'));
       if (activeId) void selectRecord(activeId);
     }
   }, [polledVars, activeRun, activeId, selectRecord]);
 
   const activeResults = useMemo(() => {
     if (!activeId) return null;
-    return storedResults[activeId] ?? null;
-  }, [activeId, storedResults]);
+    const stored = storedResults[activeId];
+    if (stored) return stored;
+    if (!activeRecord) return null;
+    return analysisFromRecord(activeRecord, activeVehicleFlag);
+  }, [activeId, storedResults, activeRecord, activeVehicleFlag]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {
@@ -734,9 +778,9 @@ export default function App() {
   }, [invoiceDownloadUrl]);
 
   const invoiceDownloadName = useMemo(() => {
-    if (!detailRecord) return 'faktura.pdf';
+    if (!detailRecord) return t('claims.invoiceDefaultName');
     const name = pickDetailField(detailRecord, 'invoiceFileName', detailContext);
-    return name !== '—' ? name : 'faktura.pdf';
+    return name !== '—' ? name : t('claims.invoiceDefaultName');
   }, [detailRecord, detailContext]);
 
   const visibleDetailFields = useMemo(() => {
@@ -791,19 +835,17 @@ export default function App() {
 
   const submitInvoiceRequest = async () => {
     if (!activeId || decisionBusy) return;
-    const message = managerComment.trim() || DEFAULT_INVOICE_REQUEST_MESSAGE;
+    const message = managerComment.trim() || t('claims.defaultInvoiceMessage');
     setDecisionBusy(true);
     setStatusMsg(null);
     try {
       await requestInvoiceCorrection(sdk, activeId, message);
-      setStatusMsg(
-        `Wysłano prośbę o poprawę faktury. Kierowca zobaczy powiadomienie w Driver App (status: Action Required).`,
-      );
+      setStatusMsg(t('banner.invoiceRequestSuccess'));
       setManagerComment('');
       await loadPage(undefined, true);
       await selectRecord(activeId);
     } catch (e) {
-      setStatusMsg(e instanceof Error ? e.message : String(e));
+      setStatusMsg(formatDataFabricWriteError(e));
     } finally {
       setDecisionBusy(false);
     }
@@ -819,7 +861,7 @@ export default function App() {
             id: alertId,
             recordId,
             message: `Kierowca poprawił zgłoszenie ${recordId.slice(0, 8)}… — status: Driver Corrected`,
-            at: new Date().toLocaleString('pl-PL'),
+            at: new Date().toLocaleString(fmt),
           },
           ...prev.slice(0, 4),
         ]);
@@ -863,51 +905,59 @@ export default function App() {
       <header className="header">
         <div className="header-left">
           <div className="brand-logo">
-            Xelto <span className="brand-logo-express">EXPRESS</span>
+            Xelto <span className="brand-logo-express">{t('brand.express')}</span>
           </div>
           <span className="header-sep">|</span>
           <div className="header-titles">
-            <span className="header-title">Fleet Manager</span>
-            <span className="header-sub">Weryfikacja kosztów kierowców</span>
+            <span className="header-title">{t('app.title')}</span>
+            <span className="header-sub">{t('app.subtitle')}</span>
           </div>
-          <span className="header-version" title="Wersja aplikacji">
+          <span className="header-version" title="App version">
             v{import.meta.env.VITE_APP_VERSION ?? '?'}
           </span>
         </div>
         <div className="header-actions">
+          <LanguageSettings />
           {maestroTarget && (
             <span className="badge badge-muted" title={maestroTarget.processKey}>
-              Maestro: {maestroTarget.name}
+              {t('header.maestroReady', { name: maestroTarget.name })}
             </span>
           )}
           <button
             type="button"
             className="btn btn-analyze"
             disabled={globalBusy || selectedIds.size === 0 || !maestroTarget}
-            title={!maestroTarget ? maestroError ?? 'Brak procesu Maestro' : undefined}
+            title={!maestroTarget ? maestroError ?? t('header.maestroMissing') : undefined}
             onClick={() => void runAnalysis([...selectedIds])}
           >
-            Analizuj zaznaczone ({selectedIds.size})
+            {t('header.analyzeSelected', { count: selectedIds.size })}
           </button>
           <button
             type="button"
             className="btn btn-analyze"
             disabled={globalBusy || !activeId || !maestroTarget}
-            title={!maestroTarget ? maestroError ?? 'Brak procesu Maestro' : undefined}
+            title={!maestroTarget ? maestroError ?? t('header.maestroMissing') : undefined}
             onClick={() => activeId && void runAnalysis([activeId])}
           >
-            Analizuj bieżący
+            {t('header.analyzeCurrent')}
           </button>
         </div>
       </header>
 
-      <nav className="main-nav" aria-label="Nawigacja główna">
+      <nav className="main-nav" aria-label={t('app.title')}>
+        <button
+          type="button"
+          className={mainSection === 'dashboard' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('dashboard')}
+        >
+          {t('nav.dashboard')}
+        </button>
         <button
           type="button"
           className={mainSection === 'claims' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
           onClick={() => setMainSection('claims')}
         >
-          Rejestr Rozliczeń
+          {t('nav.claims')}
         </button>
         <button
           type="button"
@@ -917,7 +967,7 @@ export default function App() {
             setActiveVehicleId(null);
           }}
         >
-          Pojazdy
+          {t('nav.vehicles')}
         </button>
         <button
           type="button"
@@ -927,25 +977,45 @@ export default function App() {
             setActiveCompanyId(null);
           }}
         >
-          Firma
+          {t('nav.companies')}
+        </button>
+        <button
+          type="button"
+          className={mainSection === 'insights' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('insights')}
+        >
+          {t('nav.insights')}
+        </button>
+        <button
+          type="button"
+          className={mainSection === 'settings' ? 'main-nav-btn main-nav-btn-active' : 'main-nav-btn'}
+          onClick={() => setMainSection('settings')}
+        >
+          {t('nav.settings')}
         </button>
         <button
           type="button"
           className="main-nav-btn main-nav-btn-report"
-          title="Podsumowanie floty PDF"
+          title={t('nav.fleetPdf')}
           onClick={() => {
             downloadFleetSummaryPdf({
               stats: fleetStats,
               vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
               companyCount: companyCatalog?.totalCompanies ?? 0,
+              locale,
             });
           }}
         >
-          Raport floty PDF
+          {t('nav.fleetPdf')}
         </button>
       </nav>
 
-      <GlobalFilterBar
+      <div className="language-info-rail">
+        <LanguageSettingsCard />
+      </div>
+
+      {mainSection !== 'dashboard' && mainSection !== 'insights' && mainSection !== 'settings' && (
+        <GlobalFilterBar
         section={mainSection}
         filters={claimFilters}
         onFiltersChange={setClaimFilters}
@@ -979,21 +1049,24 @@ export default function App() {
           setVehicleFilters(DEFAULT_VEHICLE_FILTERS);
           setCompanyFilters(DEFAULT_COMPANY_FILTERS);
         }}
-      />
+        />
+      )}
 
       {activeRun && (
         <div className="progress-banner">
           <div className="loading-spinner small" />
           <span>
-            Analiza w toku (instancja {activeRun.instanceId?.slice(0, 8) ?? '…'}) —{' '}
-            {polledVars?.latestRunStatus ?? 'Running'}
+            {t('claims.analysisProgress', {
+              id: activeRun.instanceId?.slice(0, 8) ?? '…',
+              status: polledVars?.latestRunStatus ?? 'Running',
+            })}
           </span>
         </div>
       )}
 
       {maestroError && !maestroTarget && (
         <div className="progress-banner">
-          <span>Maestro: {maestroError}</span>
+          <span>{t('banner.maestroError', { error: maestroError })}</span>
         </div>
       )}
 
@@ -1004,7 +1077,7 @@ export default function App() {
           {driverAlerts.map((alert) => (
             <div key={alert.id} className="driver-alert driver-alert--corrected">
               <div>
-                <strong>Powiadomienie od kierowcy</strong>
+                <strong>{t('banner.driverAlertTitle')}</strong>
                 <p>{alert.message}</p>
                 <span className="driver-alert-time">{alert.at}</span>
               </div>
@@ -1016,7 +1089,7 @@ export default function App() {
                   setDriverAlerts((prev) => prev.filter((item) => item.id !== alert.id));
                 }}
               >
-                Pokaż zgłoszenie
+                {t('banner.driverAlertShow')}
               </button>
             </div>
           ))}
@@ -1024,11 +1097,182 @@ export default function App() {
       )}
 
       <div className="main-workspace">
-        {mainSection === 'claims' ? (
+        {mainSection === 'dashboard' ? (
+          <section className="panel dashboard-panel">
+            <div className="panel-head">
+              <div>
+                <h2>{t('dashboard.title')}</h2>
+                <p className="panel-sub">{t('dashboard.subtitle')}</p>
+              </div>
+              <div className="dashboard-head-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={vehicleCatalogLoading}
+                  onClick={() => void loadVehicleTabData()}
+                >
+                  {vehicleCatalogLoading ? t('dashboard.loading') : t('dashboard.refresh')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    downloadFleetSummaryPdf({
+                      stats: fleetStats,
+                      vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
+                      companyCount: companyCatalog?.totalCompanies ?? 0,
+                      locale,
+                    });
+                  }}
+                >
+                  {t('stats.downloadPdf')}
+                </button>
+              </div>
+            </div>
+
+            {vehicleCatalogError && <p className="error-text">{vehicleCatalogError}</p>}
+
+            {vehicleCatalogLoading && allPocCosts.length === 0 ? (
+              <p className="placeholder dashboard-loading">{t('dashboard.loading')}</p>
+            ) : (
+              <>
+                <div className="dashboard-kpi-row">
+                  <div className="dashboard-kpi">
+                    <span className="dashboard-kpi-label">{t('dashboard.kpiVehicles')}</span>
+                    <span className="dashboard-kpi-value">
+                      {vehicleCatalog?.totalVehicles ?? '—'}
+                    </span>
+                  </div>
+                  <div className="dashboard-kpi">
+                    <span className="dashboard-kpi-label">{t('dashboard.kpiCompanies')}</span>
+                    <span className="dashboard-kpi-value">
+                      {companyCatalog?.totalCompanies ?? '—'}
+                    </span>
+                  </div>
+                  <div className="dashboard-kpi">
+                    <span className="dashboard-kpi-label">{t('dashboard.kpiClaims')}</span>
+                    <span className="dashboard-kpi-value">{fleetStats.claimCount}</span>
+                  </div>
+                  <div className="dashboard-kpi dashboard-kpi-warn">
+                    <span className="dashboard-kpi-label">{t('dashboard.kpiFlagged')}</span>
+                    <span className="dashboard-kpi-value">{fleetStats.flaggedCount}</span>
+                  </div>
+                </div>
+
+                <FleetStatsPanel
+                  stats={fleetStats}
+                  health={fleetHealth}
+                  title={t('dashboard.statsTitle')}
+                  onExportPdf={() => {
+                    downloadFleetSummaryPdf({
+                      stats: fleetStats,
+                      vehicleCount: vehicleCatalog?.totalVehicles ?? 0,
+                      companyCount: companyCatalog?.totalCompanies ?? 0,
+                      locale,
+                    });
+                  }}
+                />
+
+                <div className="dashboard-bottom-grid">
+                  {fleetStats.byDecision.length > 0 && (
+                    <div className="dashboard-card">
+                      <h3 className="dashboard-card-title">{t('dashboard.decisionsTitle')}</h3>
+                      <ul className="dashboard-decision-list">
+                        {fleetStats.byDecision.map((d) => (
+                          <li key={d.label} className="dashboard-decision-item">
+                            <span className="dashboard-decision-label">{d.label}</span>
+                            <span className="dashboard-decision-count">{d.count}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <section className="dashboard-risk-section dashboard-card">
+                    <div className="dashboard-risk-head">
+                      <div>
+                        <h3 className="dashboard-card-title">{t('dashboard.riskTitle')}</h3>
+                        <p className="panel-sub">{t('dashboard.riskSubtitle')}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setMainSection('insights')}
+                      >
+                        {t('dashboard.openInsights')}
+                      </button>
+                    </div>
+                    {insightRecords.length === 0 ? (
+                      <p className="placeholder">{t('dashboard.noRisk')}</p>
+                    ) : (
+                      <ul className="dashboard-risk-list">
+                        {insightRecords.slice(0, 8).map((item) => {
+                          const { record, analysis, riskScore } = item;
+                          const id = recordId(record);
+                          return (
+                            <li key={id}>
+                              <button
+                                type="button"
+                                className="dashboard-risk-card"
+                                onClick={() => {
+                                  setMainSection('insights');
+                                }}
+                              >
+                                <span className="dashboard-risk-reg">
+                                  {pickField(record, 'carRegistration', 'CarRegistration')}
+                                </span>
+                                <span className="dashboard-risk-service">
+                                  {pickField(record, 'serviceName', 'ServiceName')}
+                                </span>
+                                <span className="dashboard-risk-meta">
+                                  <span className="dashboard-risk-score">{riskScore}</span>
+                                  {analysis?.riskLevel && (
+                                    <span className="dashboard-risk-badge">{analysis.riskLevel}</span>
+                                  )}
+                                  {analysis?.combinedScore && (
+                                    <span>
+                                      {t('analysis.fraudScore')}: {analysis.combinedScore}
+                                    </span>
+                                  )}
+                                  {!analysis && <span>{t('dashboard.flaggedOnly')}</span>}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                </div>
+              </>
+            )}
+          </section>
+        ) : mainSection === 'insights' ? (
+          <InsightsSection
+            items={insightRecords}
+            fleetMedian={fleetMedianCost}
+            loading={vehicleCatalogLoading && allPocCosts.length === 0}
+            error={vehicleCatalogError}
+            maestroReady={Boolean(maestroTarget)}
+            onOpenClaim={(id) => {
+              setMainSection('claims');
+              void selectRecord(id);
+            }}
+            onAnalyzeSelected={() => {
+              if (selectedIds.size > 0) {
+                void runAnalysis([...selectedIds]);
+                return;
+              }
+              setMainSection('claims');
+            }}
+          />
+        ) : mainSection === 'settings' ? (
+          <SettingsSection />
+        ) : mainSection === 'claims' ? (
           <div className="layout master-detail-layout">
             <section className="panel table-panel master-pane">
               <div className="panel-head">
-                <h2>Rejestr Rozliczeń</h2>
+                <h2>{t('nav.claims')}</h2>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -1036,7 +1280,7 @@ export default function App() {
                     void (globalFilterActive ? loadAllForFilters() : loadPage(undefined, true))
                   }
                 >
-                  Odśwież ({recordTotal ?? records.length})
+                  {t('header.refreshCount', { count: recordTotal ?? records.length })}
                 </button>
               </div>
 
@@ -1056,7 +1300,7 @@ export default function App() {
                           onChange={toggleSelectAllPage}
                         />
                       </th>
-                      {tableColumns.map((c) => (
+                      {displayTableColumns.map((c) => (
                         <th key={c.key}>{c.label}</th>
                       ))}
                     </tr>
@@ -1064,20 +1308,18 @@ export default function App() {
                   <tbody>
                     {loadingTable ? (
                       <tr>
-                        <td colSpan={tableColumns.length + 1} className="center">
-                          {globalFilterActive
-                            ? 'Ładowanie wszystkich zgłoszeń…'
-                            : 'Ładowanie…'}
+                        <td colSpan={displayTableColumns.length + 1} className="center">
+                          {globalFilterActive ? t('claims.loadingAll') : t('common.loading')}
                         </td>
                       </tr>
                     ) : filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={tableColumns.length + 1} className="center">
+                        <td colSpan={displayTableColumns.length + 1} className="center">
                           {records.length === 0
-                            ? 'Brak zgłoszeń.'
+                            ? t('claims.empty')
                             : globalFilterActive
-                              ? `Brak wierszy spełniających filtry (przeszukano ${records.length} rekordów w bazie).`
-                              : `Brak wierszy spełniających filtry (${records.length} rekordów na stronie).`}
+                              ? t('claims.noFilterMatchGlobal', { count: records.length })
+                              : t('claims.noFilterMatchPage', { count: records.length })}
                         </td>
                       </tr>
                     ) : (
@@ -1106,7 +1348,7 @@ export default function App() {
                                 onChange={() => toggleSelect(id)}
                               />
                             </td>
-                            {tableColumns.map((c) => (
+                            {displayTableColumns.map((c) => (
                               <td key={c.key}>
                                 {c.key === 'decision' ? (
                                   <span
@@ -1148,12 +1390,15 @@ export default function App() {
                     void loadPage(prev);
                   }}
                 >
-                  ← Poprzednia
+                  {t('pager.previous')}
                 </button>
                 <span>
-                  Strona {pageIndex + 1}
+                  {t('pager.page', { current: pageIndex + 1 })}
                   {globalFilterActive && filteredRecords.length > 0
-                    ? ` z ${filteredPageCount} (${filteredRecords.length} pasujących)`
+                    ? t('pager.pageOf', {
+                        total: filteredPageCount,
+                        matching: filteredRecords.length,
+                      })
                     : ''}
                 </span>
                 <button
@@ -1169,39 +1414,39 @@ export default function App() {
                     void loadPage(cursor);
                   }}
                 >
-                  Następna →
+                  {t('pager.next')}
                 </button>
               </div>
             </section>
 
             <section className="panel detail-panel detail-pane">
               {!activeRecord ? (
-                <p className="placeholder">Wybierz wiersz, aby zobaczyć szczegóły i fakturę.</p>
+                <p className="placeholder">{t('claims.selectRowInvoice')}</p>
               ) : (
                 <>
                   <div className="meta-row">
-                    <span className="meta-label">Record ID:</span>
+                    <span className="meta-label">{t('common.recordId')}:</span>
                     <span className="meta-value">{recordId(activeRecord)}</span>
                   </div>
 
                   <div className="detail-split">
                     <div className="detail-split-main">
-                      <h3 className="section-title">Szczegóły zgłoszenia</h3>
+                      <h3 className="section-title">{t('claims.detailsTitle')}</h3>
                       <dl className="detail-grid">
                         {visibleDetailFields.map((key) => (
                           <div key={key} className="detail-item">
-                            <dt>{DETAIL_FIELD_LABELS[key] ?? key}</dt>
+                            <dt>{localizedFieldLabel(key, t)}</dt>
                             <dd>
                               {key === 'invoiceFileName' ? (
                                 invoiceLoading ? (
-                                  <span className="hint-small">Pobieranie załącznika…</span>
+                                  <span className="hint-small">{t('claims.downloadingAttachment')}</span>
                                 ) : invoiceDownloadUrl ? (
                                   <a
                                     className="invoice-download-link"
                                     href={invoiceDownloadUrl}
                                     download={invoiceDownloadName}
                                   >
-                                    Pobierz {invoiceDownloadName}
+                                    {t('claims.downloadFile', { name: invoiceDownloadName })}
                                   </a>
                                 ) : (
                                   '—'
@@ -1218,7 +1463,7 @@ export default function App() {
                     </div>
 
                     <aside className="detail-split-preview">
-                      <h3 className="section-title">Szybki podgląd faktury</h3>
+                      <h3 className="section-title">{t('claims.invoicePreview')}</h3>
                       <InvoicePreview
                         blob={invoiceBlob}
                         mime={invoiceMime}
@@ -1238,42 +1483,36 @@ export default function App() {
                   <AnalysisResults results={activeResults} />
 
                   <div className="decision-hint">
-                    <p className="section-sub">Decyzja managera</p>
+                    <p className="section-sub">{t('claims.managerDecision')}</p>
                     {activeRecord && isAwaitingDriverCorrection(activeRecord) && (
                       <div className="driver-review-banner">
-                        <strong>Oczekuje na kierowcę</strong>
-                        <p>
-                          Wysłano prośbę o poprawę faktury. Kierowca zobaczy powiadomienie w Driver
-                          App.
-                        </p>
+                        <strong>{t('claims.awaitingDriverTitle')}</strong>
+                        <p>{t('claims.awaitingDriverText')}</p>
                         <a
                           className="driver-review-link"
                           href={buildDriverCorrectionUrl(
                             activeId ?? '',
                             pickField(activeRecord, 'fleetManagerNote', 'FleetManagerNote') !== '—'
                               ? pickField(activeRecord, 'fleetManagerNote', 'FleetManagerNote')
-                              : DEFAULT_INVOICE_REQUEST_MESSAGE,
+                              : t('claims.defaultInvoiceMessage'),
                           )}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Otwórz Driver App dla tego zgłoszenia
+                          {t('claims.openDriverApp')}
                         </a>
                       </div>
                     )}
                     {activeRecord && isDriverCorrected(activeRecord) && (
                       <div className="driver-corrected-banner">
-                        <strong>Poprawione przez kierowcę</strong>
-                        <p>
-                          Kierowca zaktualizował zgłoszenie — zweryfikuj fakturę i zatwierdź lub
-                          odrzuć.
-                        </p>
+                        <strong>{t('banner.driverCorrectedBannerTitle')}</strong>
+                        <p>{t('banner.driverCorrectedBannerText')}</p>
                       </div>
                     )}
                     <textarea
                       className="manager-comment"
                       rows={3}
-                      placeholder="Wiadomość do kierowcy przy „Zapytaj o fakturę” (opcjonalnie)…"
+                      placeholder={t('claims.managerCommentPlaceholder')}
                       value={managerComment}
                       onChange={(e) => setManagerComment(e.target.value)}
                     />
@@ -1284,7 +1523,7 @@ export default function App() {
                         disabled={decisionBusy || globalBusy}
                         onClick={() => void submitManagerDecision('Approved')}
                       >
-                        ✓ Zatwierdź
+                        {t('claims.approveBtn')}
                       </button>
                       <button
                         type="button"
@@ -1292,16 +1531,16 @@ export default function App() {
                         disabled={decisionBusy || globalBusy}
                         onClick={() => void submitManagerDecision('Rejected')}
                       >
-                        ✗ Odrzuć
+                        {t('claims.rejectBtn')}
                       </button>
                       <button
                         type="button"
                         className="btn btn-clarify"
                         disabled={decisionBusy || globalBusy}
                         onClick={() => void submitInvoiceRequest()}
-                        title={DEFAULT_INVOICE_REQUEST_MESSAGE}
+                        title={t('claims.defaultInvoiceMessage')}
                       >
-                        📄 Zapytaj o fakturę
+                        {t('claims.requestInvoiceIcon')}
                       </button>
                       <button
                         type="button"
@@ -1309,15 +1548,10 @@ export default function App() {
                         disabled={decisionBusy || globalBusy || !maestroTarget}
                         onClick={() => activeId && void runAnalysis([activeId])}
                       >
-                        ↑ Analizuj (Maestro)
+                        ↑ {t('claims.analyzeMaestro')}
                       </button>
                     </div>
-                    <p className="hint-small">
-                      Zatwierdź/Odrzuć zapisuje Status w DPD_POC. „Zapytaj o fakturę” ustawia{' '}
-                      <strong>Action Required</strong> i wysyła wiadomość do Driver App
-                      {managerComment.trim() ? ' (Twój komentarz)' : ' (domyślny tekst)'}.
-                      Po poprawce kierowca pojawi się jako <strong>Driver Corrected</strong>.
-                    </p>
+                    <p className="hint-small">{t('claims.actionsHint')}</p>
                   </div>
                 </>
               )}
@@ -1327,7 +1561,7 @@ export default function App() {
           <div className="layout master-detail-layout">
             <section className="panel table-panel master-pane">
               <div className="panel-head">
-                <h2>Lista pojazdów (DPD_B2B_Vehicles)</h2>
+                <h2>{t('vehicles.listTitle')}</h2>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -1337,7 +1571,7 @@ export default function App() {
                     void loadVehicleTabData();
                   }}
                 >
-                  Odśwież ({vehicleCatalog?.totalVehicles ?? '…'})
+                  {t('header.refreshCount', { count: vehicleCatalog?.totalVehicles ?? '…' })}
                 </button>
               </div>
 
@@ -1347,27 +1581,25 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Pojazd</th>
-                      <th>Region / miasto</th>
-                      <th>Firma kurierska</th>
-                      <th className="col-numeric">Health</th>
-                      <th className="col-numeric">Koszty</th>
-                      <th className="col-numeric">POC</th>
+                      <th>{t('table.vehicle')}</th>
+                      <th>{t('common.regionCity')}</th>
+                      <th>{t('vehicles.courierCompany')}</th>
+                      <th className="col-numeric">{t('common.health')}</th>
+                      <th className="col-numeric">{t('common.costs')}</th>
+                      <th className="col-numeric">{t('vehicles.poc')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {vehicleCatalogLoading ? (
                       <tr>
                         <td colSpan={6} className="center">
-                          Ładowanie pojazdów i słowników regionów / firm…
+                          {t('vehicles.loading')}
                         </td>
                       </tr>
                     ) : filteredVehicles.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="center">
-                          {vehicleCatalog
-                            ? 'Brak pojazdów spełniających filtry.'
-                            : 'Brak danych pojazdów.'}
+                          {vehicleCatalog ? t('vehicles.noFilter') : t('vehicles.noData')}
                         </td>
                       </tr>
                     ) : (
@@ -1394,7 +1626,7 @@ export default function App() {
                             </td>
                             <td className="col-numeric">
                               {v.totalCost != null && v.totalCost > 0
-                                ? v.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
+                                ? v.totalCost.toLocaleString(fmt, { maximumFractionDigits: 0 })
                                 : '—'}
                             </td>
                             <td className="col-numeric">{pocCount}</td>
@@ -1409,43 +1641,42 @@ export default function App() {
 
             <section className="panel detail-panel detail-pane">
               {!activeVehicle ? (
-                <p className="placeholder">
-                  Wybierz pojazd z listy po lewej (B2B), aby zobaczyć region, firmę i powiązane koszty
-                  DPD_POC.
-                </p>
+                <p className="placeholder">{t('vehicles.selectHintLong')}</p>
               ) : (
                 <>
                   <div className="detail-preview-card">
-                    <h3 className="section-title">Podgląd pojazdu</h3>
+                    <h3 className="section-title">{t('vehicles.previewTitle')}</h3>
                     <div className="meta-row">
-                      <span className="meta-label">Rejestracja:</span>
+                      <span className="meta-label">{t('vehicles.registration')}:</span>
                       <span className="meta-value">{activeVehicle.registration}</span>
                     </div>
                     <dl className="detail-grid detail-grid-compact">
                       <div className="detail-item">
-                        <dt>Region / miasto</dt>
+                        <dt>{t('common.regionCity')}</dt>
                         <dd>{activeVehicle.areaLabel || '—'}</dd>
                       </div>
                       <div className="detail-item">
-                        <dt>Firma kurierska</dt>
+                        <dt>{t('vehicles.courierCompany')}</dt>
                         <dd>{activeVehicle.companyLabel || '—'}</dd>
                       </div>
                     </dl>
                     <p className="hint-small">
-                      {activeVehicleCosts.length} zgłoszeń DPD_POC · suma netto:{' '}
-                      {activeVehicleCosts
-                        .reduce((acc, r) => acc + (getRecordNumericAmount(r) ?? 0), 0)
-                        .toLocaleString('pl-PL', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                      {t('vehicles.claimsSummary', {
+                        count: activeVehicleCosts.length,
+                        total: activeVehicleCosts
+                          .reduce((acc, r) => acc + (getRecordNumericAmount(r) ?? 0), 0)
+                          .toLocaleString(fmt, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }),
+                      })}
                     </p>
                     <button
                       type="button"
                       className="btn btn-primary"
                       onClick={() => openVehicleInClaims(activeVehicle.registration)}
                     >
-                      Otwórz rejestr rozliczeń dla tego pojazdu
+                      {t('vehicles.openClaims')}
                     </button>
                   </div>
 
@@ -1455,7 +1686,7 @@ export default function App() {
                     <FleetStatsPanel
                       stats={activeVehicleStats}
                       health={activeVehicleHealth}
-                      title="Statystyki kosztów pojazdu"
+                      title={t('vehicles.statsTitle')}
                       onExportPdf={() => {
                         const compliance =
                           activeVehicle.compliance ??
@@ -1465,26 +1696,27 @@ export default function App() {
                           stats: activeVehicleStats,
                           health: activeVehicleHealth,
                           compliance,
+                          locale,
                         });
                       }}
                     />
                   )}
 
-                  <h3 className="section-title">Rozliczenia w rejestrze</h3>
+                  <h3 className="section-title">{t('vehicles.costsInRegister')}</h3>
                   <div className="table-wrap table-wrap-nested">
                     <table>
                       <thead>
                         <tr>
-                          <th>Usługa</th>
-                          <th className="col-numeric">Kwota netto</th>
-                          <th>Status</th>
+                          <th>{t('table.service')}</th>
+                          <th className="col-numeric">{t('vehicles.netAmount')}</th>
+                          <th>{t('common.status')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {activeVehicleCosts.length === 0 ? (
                           <tr>
                             <td colSpan={3} className="center">
-                              Brak kosztów POC dla tej rejestracji.
+                              {t('vehicles.noCosts')}
                             </td>
                           </tr>
                         ) : (
@@ -1510,9 +1742,7 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="hint-small">
-                    Kliknij wiersz kosztu, aby otworzyć zgłoszenie z fakturą i decyzją managera.
-                  </p>
+                  <p className="hint-small">{t('vehicles.clickCostHint')}</p>
                 </>
               )}
             </section>
@@ -1540,6 +1770,7 @@ export default function App() {
                 stats: activeCompanyStats,
                 health: activeCompanyHealth,
                 vehicles: enrichedVehicles.filter((v) => v.companyLabel === activeCompany.name),
+                locale,
               });
             }}
           />

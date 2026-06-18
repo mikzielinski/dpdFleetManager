@@ -6,6 +6,29 @@ import type { VehicleCompliance } from '../utils/vehicleCompliance';
 import { SERVICE_CATEGORIES } from '../utils/serviceCategories';
 import type { VehicleCatalogItem } from './vehicleCatalog';
 import type { CompanyCatalogItem } from './companyCatalog';
+import { translate } from '../i18n/translate';
+import plLocale from '../i18n/locales/pl.json';
+import enLocale from '../i18n/locales/en.json';
+
+function pdfT(locale: string, key: string, params?: Record<string, string | number>): string {
+  const messages = (locale === 'en' ? enLocale.strings : plLocale.strings) as Record<
+    string,
+    unknown
+  >;
+  return translate(messages, key, params);
+}
+
+function pdfHealthSummary(health: HealthScoreResult, locale: string): string {
+  return pdfT(locale, `health.summary.${health.summaryKey}`);
+}
+
+function pdfHealthFactorRows(health: HealthScoreResult, locale: string): string[][] {
+  return health.factors.map((f) => [
+    pdfT(locale, `health.factors.${f.key}.label`),
+    String(f.impact),
+    pdfT(locale, `health.factors.${f.key}.detail`, f.params),
+  ]);
+}
 
 const BRAND_NAVY: [number, number, number] = [26, 27, 58];
 const BRAND_ORANGE: [number, number, number] = [232, 119, 34];
@@ -42,8 +65,9 @@ export function downloadVehicleReportPdf(opts: {
   stats: FleetCostStats;
   health: HealthScoreResult;
   compliance: VehicleCompliance;
+  locale?: string;
 }) {
-  const { vehicle, stats, health, compliance } = opts;
+  const { vehicle, stats, health, compliance, locale = 'pl' } = opts;
   const doc = new jsPDF();
   addBrandHeader(
     doc,
@@ -59,7 +83,7 @@ export function downloadVehicleReportPdf(opts: {
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(health.summary, 14, y);
+  doc.text(pdfHealthSummary(health, locale), 14, y);
   y += 10;
 
   autoTable(doc, {
@@ -128,7 +152,7 @@ export function downloadVehicleReportPdf(opts: {
     autoTable(doc, {
       startY: y,
       head: [['Czynnik', 'Wpływ', 'Szczegóły']],
-      body: health.factors.map((f) => [f.label, String(f.impact), f.detail]),
+      body: pdfHealthFactorRows(health, locale),
       headStyles: { fillColor: BRAND_DARK },
       styles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
@@ -150,6 +174,7 @@ export function downloadCompanyReportPdf(opts: {
   stats: FleetCostStats;
   health: HealthScoreResult;
   vehicles: VehicleCatalogItem[];
+  locale?: string;
 }) {
   const { company, stats, health, vehicles } = opts;
   const doc = new jsPDF();
@@ -223,6 +248,7 @@ export function downloadFleetSummaryPdf(opts: {
   stats: FleetCostStats;
   vehicleCount: number;
   companyCount: number;
+  locale?: string;
 }) {
   const doc = new jsPDF();
   addBrandHeader(doc, 'Podsumowanie floty', 'Rejestr rozliczeń DPD_POC');

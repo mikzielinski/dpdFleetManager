@@ -14,6 +14,9 @@ const outDir = path.join(root, '.uipath');
 const templateDir = path.join(outDir, 'nupkg-inspect', 'content');
 const STUDIO_PROJECT_ID = process.env.STUDIO_PROJECT_ID || '28ac09c2-3a5c-4ba8-a78c-80883f38e6b5';
 const OAUTH_CLIENT_ID = '98aa3ef7-06e0-431b-9997-1963d708bd45';
+const DEFAULT_SCOPE = JSON.parse(
+  fs.readFileSync(path.join(root, 'uipath.json'), 'utf8'),
+).scope;
 
 const nuspec = `<?xml version="1.0"?>
 <package>
@@ -68,7 +71,7 @@ fs.writeFileSync(
   path.join(distDir, 'uipath.json'),
   JSON.stringify(
     {
-      scope: '',
+      scope: process.env.VITE_UIPATH_SCOPE || DEFAULT_SCOPE,
       clientId: OAUTH_CLIENT_ID,
       orgName: 'mzpocevylrxu',
       tenantName: 'DefaultTenant',

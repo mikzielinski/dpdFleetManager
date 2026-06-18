@@ -1,3 +1,13 @@
+/** Minimum OAuth scopes — Data Fabric (read/write) + PIMS. Must match External Application. */
+export const UIPATH_CORE_SCOPE =
+  'DataFabric.Schema.Read DataFabric.Data.Read DataFabric.Data.Write PIMS';
+
+/** Optional — enable Maestro / Orchestrator after adding these user scopes in External Application. */
+export const UIPATH_MAESTRO_SCOPE = 'OR.Execution OR.Jobs OR.Folders.Read';
+
+/** Full scope when Orchestrator user scopes are configured in the portal. */
+export const UIPATH_DEFAULT_SCOPE = `${UIPATH_CORE_SCOPE} ${UIPATH_MAESTRO_SCOPE}`;
+
 /** Data Fabric entity DPD_POC / DPD_FEE (staging) — NOT a field GUID */
 export const DPD_POC_ENTITY_ID = '4e2e38d9-bf4a-f111-8ef3-000d3a261acd';
 

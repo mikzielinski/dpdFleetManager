@@ -5,6 +5,8 @@ import type { HealthScoreResult } from '../utils/healthScore';
 import { healthGradeClass } from '../utils/healthScore';
 import type { VehicleCatalogItem } from '../services/vehicleCatalog';
 import { FleetStatsPanel } from './FleetStatsPanel';
+import { useI18n } from '../i18n/I18nProvider';
+import { formatLocale } from '../i18n/uiLabels';
 
 interface Props {
   catalog: CompanyCatalogData | null;
@@ -35,6 +37,9 @@ export function CompaniesSection({
   onOpenVehicle,
   onExportCompanyPdf,
 }: Props) {
+  const { t, locale } = useI18n();
+  const fmt = formatLocale(locale);
+
   const active =
     activeCompanyId && catalog
       ? filtered.find((c) => c.id === activeCompanyId) ??
@@ -47,9 +52,9 @@ export function CompaniesSection({
     <div className="layout master-detail-layout">
       <section className="panel table-panel master-pane">
         <div className="panel-head">
-          <h2>Firmy kurierskie (DPD_B2B_Courier_Companies)</h2>
+          <h2>{t('companies.listTitle')}</h2>
           <button type="button" className="btn btn-ghost" disabled={loading} onClick={onRefresh}>
-            Odśwież ({catalog?.totalCompanies ?? '…'})
+            {t('header.refreshCount', { count: catalog?.totalCompanies ?? '…' })}
           </button>
         </div>
 
@@ -59,24 +64,24 @@ export function CompaniesSection({
           <table>
             <thead>
               <tr>
-                <th>Firma</th>
-                <th>Region / miasto</th>
-                <th className="col-numeric">Health</th>
-                <th className="col-numeric">Koszty</th>
-                <th className="col-numeric">Pojazdy</th>
+                <th>{t('table.company')}</th>
+                <th>{t('common.regionCity')}</th>
+                <th className="col-numeric">{t('common.health')}</th>
+                <th className="col-numeric">{t('common.costs')}</th>
+                <th className="col-numeric">{t('companies.vehiclesCol')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={5} className="center">
-                    Ładowanie słownika firm…
+                    {t('companies.loading')}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="center">
-                    {catalog ? 'Brak firm spełniających filtry.' : 'Brak danych firm.'}
+                    {catalog ? t('companies.noFilter') : t('companies.noData')}
                   </td>
                 </tr>
               ) : (
@@ -97,7 +102,7 @@ export function CompaniesSection({
                     </td>
                     <td className="col-numeric">
                       {c.totalCost != null && c.totalCost > 0
-                        ? c.totalCost.toLocaleString('pl-PL', { maximumFractionDigits: 0 })
+                        ? c.totalCost.toLocaleString(fmt, { maximumFractionDigits: 0 })
                         : '—'}
                     </td>
                     <td className="col-numeric">{c.vehicleCount}</td>
@@ -111,24 +116,22 @@ export function CompaniesSection({
 
       <section className="panel detail-panel detail-pane">
         {!active ? (
-          <p className="placeholder">
-            Wybierz firmę z listy, aby zobaczyć statystyki kosztów, health score i pojazdy floty.
-          </p>
+          <p className="placeholder">{t('companies.selectHintLong')}</p>
         ) : (
           <>
             <div className="detail-preview-card">
-              <h3 className="section-title">Podgląd firmy</h3>
+              <h3 className="section-title">{t('companies.previewTitle')}</h3>
               <dl className="detail-grid detail-grid-compact">
                 <div className="detail-item">
-                  <dt>Nazwa</dt>
+                  <dt>{t('common.name')}</dt>
                   <dd>{active.name}</dd>
                 </div>
                 <div className="detail-item">
-                  <dt>Region / miasto</dt>
+                  <dt>{t('common.regionCity')}</dt>
                   <dd>{active.areaLabel || '—'}</dd>
                 </div>
                 <div className="detail-item">
-                  <dt>Pojazdy we flocie</dt>
+                  <dt>{t('companies.fleetVehicles')}</dt>
                   <dd>{active.vehicleCount}</dd>
                 </div>
               </dl>
@@ -138,26 +141,26 @@ export function CompaniesSection({
               <FleetStatsPanel
                 stats={activeCompanyStats}
                 health={activeCompanyHealth}
-                title="Statystyki kosztów firmy"
+                title={t('companies.statsTitle')}
                 onExportPdf={onExportCompanyPdf}
               />
             )}
 
-            <h3 className="section-title">Pojazdy B2B</h3>
+            <h3 className="section-title">{t('companies.b2bVehicles')}</h3>
             <div className="table-wrap table-wrap-nested">
               <table>
                 <thead>
                   <tr>
-                    <th>Rejestracja</th>
-                    <th>Region</th>
-                    <th className="col-numeric">Health</th>
+                    <th>{t('vehicles.registration')}</th>
+                    <th>{t('common.regionCity')}</th>
+                    <th className="col-numeric">{t('common.health')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {assigned.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="center">
-                        Brak pojazdów przypisanych do tej firmy w katalogu floty.
+                        {t('companies.noVehicles')}
                       </td>
                     </tr>
                   ) : (
@@ -178,7 +181,7 @@ export function CompaniesSection({
                 </tbody>
               </table>
             </div>
-            <p className="hint-small">Kliknij rejestrację, aby przejść do zakładki Pojazdy.</p>
+            <p className="hint-small">{t('companies.clickRegistration')}</p>
           </>
         )}
       </section>

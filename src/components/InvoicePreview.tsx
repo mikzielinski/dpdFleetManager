@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
   blob: Blob | null;
@@ -17,6 +18,7 @@ async function sniffMime(blob: Blob): Promise<string> {
 }
 
 export function InvoicePreview({ blob, mime, loading, error }: Props) {
+  const { t } = useI18n();
   const [url, setUrl] = useState<string | null>(null);
   const [effectiveMime, setEffectiveMime] = useState(mime);
 
@@ -44,7 +46,7 @@ export function InvoicePreview({ blob, mime, loading, error }: Props) {
     return (
       <div className="preview-box preview-loading">
         <div className="loading-spinner" />
-        <p>Ładowanie faktury…</p>
+        <p>{t('preview.loading')}</p>
       </div>
     );
   }
@@ -54,11 +56,7 @@ export function InvoicePreview({ blob, mime, loading, error }: Props) {
   }
 
   if (!blob || !url) {
-    return (
-      <div className="preview-box preview-empty">
-        Brak pliku faktury dla tego rekordu (pole typu File w Data Fabric).
-      </div>
-    );
+    return <div className="preview-box preview-empty">{t('preview.empty')}</div>;
   }
 
   const isPdf = effectiveMime.includes('pdf');
@@ -66,18 +64,18 @@ export function InvoicePreview({ blob, mime, loading, error }: Props) {
 
   return (
     <div className="preview-box">
-      {isPdf && <iframe title="Podgląd faktury PDF" src={url} className="preview-iframe" />}
-      {isImage && <img src={url} alt="Faktura" className="preview-image" />}
+      {isPdf && (
+        <iframe title={t('preview.pdfTitle')} src={url} className="preview-iframe" />
+      )}
+      {isImage && <img src={url} alt={t('preview.imageAlt')} className="preview-image" />}
       {!isPdf && !isImage && (
         <div className="preview-fallback">
-          <p>Podgląd niedostępny ({effectiveMime})</p>
-          <a href={url} download="faktura">
-            Pobierz plik
+          <p>{t('preview.unavailable', { mime: effectiveMime })}</p>
+          <a href={url} download="invoice">
+            {t('preview.downloadFile')}
           </a>
         </div>
       )}
     </div>
   );
 }
-
-

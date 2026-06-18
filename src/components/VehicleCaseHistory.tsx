@@ -1,4 +1,5 @@
 import type { VehicleFlagHistoryItem } from '../services/dataFabric';
+import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
   items: VehicleFlagHistoryItem[];
@@ -8,23 +9,15 @@ interface Props {
 }
 
 export function VehicleCaseHistory({ items, loading, error, carRegistration }: Props) {
+  const { t } = useI18n();
+
   return (
     <section className="case-history">
-      <h3 className="section-title">Historia zgłoszeń pojazdu</h3>
-      {loading && <p className="hint-small">Ładowanie historii z DPD_VehicleFlags…</p>}
+      <h3 className="section-title">{t('history.title')}</h3>
+      {loading && <p className="hint-small">{t('history.loading')}</p>}
       {error && <p className="error-text">{error}</p>}
       {!loading && !error && items.length === 0 && (
-        <p className="hint-small">
-          Brak historii dla rejestracji <strong>{carRegistration}</strong> w encji{' '}
-          <a
-            href="https://staging.uipath.com/mzpocevylrxu/DefaultTenant/datafabric_/entities/8d83c3fe-c34a-f111-8ef3-000d3a261acd"
-            target="_blank"
-            rel="noreferrer"
-          >
-            DPD_VehicleFlags
-          </a>
-          . Pole <em>Vehicle ID</em> musi odpowiadać numerowi rejestracyjnemu (np. WA 622 AV).
-        </p>
+        <p className="hint-small">{t('history.empty', { registration: carRegistration })}</p>
       )}
       {!loading && items.length > 0 && (
         <ul className="case-history-list">
@@ -39,11 +32,13 @@ export function VehicleCaseHistory({ items, loading, error, carRegistration }: P
               <p className="case-history-desc">{item.description}</p>
               {item.requiresAction !== '—' && (
                 <p className="case-history-action">
-                  <span className="meta-label">Wymagane:</span> {item.requiresAction}
+                  <span className="meta-label">{t('history.required')}:</span> {item.requiresAction}
                 </p>
               )}
               {item.relatedCostRecordId !== '—' && (
-                <p className="hint-small">Powiązany koszt: {item.relatedCostRecordId}</p>
+                <p className="hint-small">
+                  {t('history.relatedCost')}: {item.relatedCostRecordId}
+                </p>
               )}
             </li>
           ))}

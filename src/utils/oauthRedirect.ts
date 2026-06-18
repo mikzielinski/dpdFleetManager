@@ -1,3 +1,5 @@
+import { UIPATH_DEFAULT_SCOPE } from '../config';
+
 const OAUTH_ERROR_STORAGE_KEY = 'dpd-fleet-manager-oauth-url-error';
 
 const STAGING_ORG_NAME = 'mzpocevylrxu';
@@ -7,6 +9,15 @@ const APP_ROUTE = 'dpdmonitoring';
 /** Optional build-time override (fallback when window is unavailable). */
 export function getEnvRedirectUri(): string {
   return (import.meta.env.VITE_UIPATH_REDIRECT_URI ?? '').trim();
+}
+
+/**
+ * OAuth scope for SDK authorize. Uses build-time VITE_UIPATH_SCOPE only.
+ * Do NOT read meta uipath:scope — hosted Apps inject every External Application
+ * scope (OR.*, PM.*, …) and Identity rejects the request with "Invalid scope".
+ */
+export function resolveOAuthScope(): string {
+  return (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim() || UIPATH_DEFAULT_SCOPE;
 }
 
 /** True only when SDK actually uses the env value (not the browser URL). */
@@ -177,6 +188,16 @@ export function parseOAuthUrlError(): string | null {
 
   if (!hint && isAccountAccessError(errorCode, errorDescription)) {
     hint = getAccountAccessErrorHint();
+  }
+
+  const descLower = (errorDescription ?? '').toLowerCase();
+  if (!hint && (descLower.includes('invalid scope') || descLower.includes('nieprawidłowy zakres'))) {
+    hint = [
+      'Aplikacja żąda scope, których nie ma w External Application.',
+      'Fleet Manager (minimum): DataFabric.Schema.Read, DataFabric.Data.Read, DataFabric.Data.Write, PIMS.',
+      'Maestro wymaga dodatkowo: OR.Execution, OR.Jobs, OR.Folders.Read (UiPath.Orchestrator → User scopes).',
+      `Portal: ${STAGING_PORTAL_ORG_URL}/portal_/admin/external-apps/oauth`,
+    ].join(' ');
   }
 
   const parts = [

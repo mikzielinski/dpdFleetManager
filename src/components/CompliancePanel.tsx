@@ -1,66 +1,60 @@
 import type { VehicleCompliance } from '../utils/vehicleCompliance';
+import { useI18n } from '../i18n/I18nProvider';
+import { formatLocale } from '../i18n/uiLabels';
 
 interface Props {
   compliance: VehicleCompliance;
 }
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'ok':
-      return 'Ważne';
-    case 'due_soon':
-      return 'Wkrótce wygasa';
-    case 'expired':
-      return 'Po terminie';
-    default:
-      return 'Brak danych';
-  }
-}
-
-function statusClass(status: string): string {
-  return `compliance-status compliance-status-${status}`;
-}
-
 export function CompliancePanel({ compliance }: Props) {
+  const { t, locale } = useI18n();
+  const fmt = formatLocale(locale);
+
+  const statusLabel = (status: string): string => {
+    const key = `compliance.status.${status}`;
+    const label = t(key);
+    return label === key ? t('compliance.status.unknown') : label;
+  };
+
   const mileageNote =
     compliance.mileageSource === 'estimated'
-      ? ' (estymata — uzupełnij pole w DPD_B2B_Vehicles)'
+      ? t('compliance.mileageEstimated')
       : compliance.mileageSource === 'fabric'
         ? ''
-        : ' (brak w encji)';
+        : t('compliance.mileageMissing');
 
   return (
     <div className="compliance-panel">
-      <h3 className="section-title">Compliance pojazdu</h3>
+      <h3 className="section-title">{t('compliance.title')}</h3>
 
       <dl className="detail-grid detail-grid-compact">
         <div className="detail-item">
-          <dt>Przebieg</dt>
+          <dt>{t('compliance.mileage')}</dt>
           <dd>
             {compliance.mileageKm != null
-              ? `${compliance.mileageKm.toLocaleString('pl-PL')} km`
+              ? `${compliance.mileageKm.toLocaleString(fmt)} km`
               : '—'}
             <span className="hint-inline">{mileageNote}</span>
           </dd>
         </div>
         <div className="detail-item">
-          <dt>Badanie techniczne do</dt>
+          <dt>{t('compliance.inspectionUntil')}</dt>
           <dd>
-            <span className={statusClass(compliance.inspectionStatus)}>
+            <span className={`compliance-status compliance-status-${compliance.inspectionStatus}`}>
               {compliance.inspectionValidUntil ?? '—'} — {statusLabel(compliance.inspectionStatus)}
             </span>
           </dd>
         </div>
       </dl>
 
-      <h4 className="stats-subtitle">Ubezpieczenia</h4>
+      <h4 className="stats-subtitle">{t('compliance.policies')}</h4>
       <div className="table-wrap table-wrap-nested">
         <table>
           <thead>
             <tr>
-              <th>Typ polisy</th>
-              <th>Ważna do</th>
-              <th>Status</th>
+              <th>{t('compliance.policyType')}</th>
+              <th>{t('compliance.validUntil')}</th>
+              <th>{t('common.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +63,9 @@ export function CompliancePanel({ compliance }: Props) {
                 <td>{p.label}</td>
                 <td>{p.validUntil ?? '—'}</td>
                 <td>
-                  <span className={statusClass(p.status)}>{statusLabel(p.status)}</span>
+                  <span className={`compliance-status compliance-status-${p.status}`}>
+                    {statusLabel(p.status)}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -79,7 +75,7 @@ export function CompliancePanel({ compliance }: Props) {
 
       {compliance.complianceIssues.length > 0 && (
         <div className="compliance-alerts">
-          <strong>Nieprawidłowości biznesowe</strong>
+          <strong>{t('compliance.issues')}</strong>
           <ul>
             {compliance.complianceIssues.map((issue) => (
               <li key={issue}>{issue}</li>

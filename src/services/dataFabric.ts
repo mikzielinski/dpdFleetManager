@@ -37,6 +37,19 @@ import {
   sliceMockRecords,
 } from './demoData';
 
+/** User-facing message when OAuth token lacks DataFabric.Data.Write. */
+export function formatDataFabricWriteError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (/insufficient_scope/i.test(msg)) {
+    return (
+      'Brak uprawnień do zapisu w Data Fabric (insufficient_scope). ' +
+      'Administrator musi dodać scope DataFabric.Data.Write w External Application ' +
+      '(Admin → External Applications) i zalogować się ponownie w Fleet Manager.'
+    );
+  }
+  return msg;
+}
+
 export interface EntityContext {
   entity: EntityGetResponse;
   fileFields: string[];
@@ -277,20 +290,33 @@ export async function requestInvoiceCorrection(
   }
 
   const entities = new Entities(sdk);
-  const now = new Date().toISOString();
   const note = message.trim();
+
+  // Core fields — always present on DPD_POC
   await entities.updateRecordById(
     DPD_POC_ENTITY_ID,
     recordId,
     {
       Status: CORRECTION_REQUEST_STATUS,
       FleetManagerNote: note,
-      DriverNotificationMessage: note,
-      DriverNotificationStatus: DRIVER_NOTIFICATION_OPEN,
-      CorrectionRequestedAt: now,
     },
     { expansionLevel: 1 },
   );
+
+  // Optional notification metadata — may not exist in entity schema yet
+  try {
+    await entities.updateRecordById(
+      DPD_POC_ENTITY_ID,
+      recordId,
+      {
+        DriverNotificationStatus: DRIVER_NOTIFICATION_OPEN,
+        CorrectionRequestedAt: new Date().toISOString(),
+      },
+      { expansionLevel: 0 },
+    );
+  } catch {
+    /* non-fatal if schema lacks these fields */
+  }
 }
 
 /** Mark record as corrected by driver — easy to filter in claims register. */
@@ -308,13 +334,23 @@ export async function markDriverCorrectionReceived(
   await entities.updateRecordById(
     DPD_POC_ENTITY_ID,
     recordId,
-    {
-      Status: DRIVER_CORRECTED_STATUS,
-      DriverNotificationStatus: DRIVER_NOTIFICATION_CLOSED,
-      CorrectionResolvedAt: resolvedAt ?? new Date().toISOString(),
-    },
+    { Status: DRIVER_CORRECTED_STATUS },
     { expansionLevel: 1 },
   );
+
+  try {
+    await entities.updateRecordById(
+      DPD_POC_ENTITY_ID,
+      recordId,
+      {
+        DriverNotificationStatus: DRIVER_NOTIFICATION_CLOSED,
+        CorrectionResolvedAt: resolvedAt ?? new Date().toISOString(),
+      },
+      { expansionLevel: 0 },
+    );
+  } catch {
+    /* non-fatal */
+  }
 }
 
 export async function downloadInvoiceBlob(

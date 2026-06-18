@@ -23,6 +23,7 @@ import {
   isStudioDesignerPreview,
   readPersistedOAuthUrlError,
   resolveRedirectUri,
+  resolveOAuthScope,
   getAccountAccessErrorHint,
 } from '../utils/oauthRedirect';
 import {
@@ -30,6 +31,8 @@ import {
   getStagingExternalAppsUrl,
   getStagingPortalOrgUrl,
 } from '../utils/uipathOAuth';
+import { LanguageSettings } from '../components/LanguageSettings';
+import { useI18n } from '../i18n/I18nProvider';
 
 import { BYPASS_AUTH } from '../services/demoData';
 
@@ -64,7 +67,7 @@ function readAuthConfig(): AuthConfigResult {
   const clientId =
     getMetaTagContent('uipath:client-id') ||
     (import.meta.env.VITE_UIPATH_CLIENT_ID ?? '').trim();
-  const scope = (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim();
+  const scope = resolveOAuthScope();
   const orgName =
     getMetaTagContent('uipath:org-name') || (import.meta.env.VITE_UIPATH_ORG_NAME ?? '').trim();
   const tenantName =
@@ -127,9 +130,7 @@ function getStubAuthConfig(): UiPathSDKConfig {
     tenantName: (import.meta.env.VITE_UIPATH_TENANT_NAME ?? '').trim() || 'DefaultTenant',
     clientId: (import.meta.env.VITE_UIPATH_CLIENT_ID ?? '').trim() || 'bypass-dev-client',
     redirectUri: resolveRedirectUri(),
-    scope:
-      (import.meta.env.VITE_UIPATH_SCOPE ?? '').trim() ||
-      'DataFabric.Schema.Read DataFabric.Data.Read',
+    scope: resolveOAuthScope(),
   };
 }
 
@@ -263,24 +264,26 @@ export function AuthLoginScreen({
   onLogin: () => void;
   onDismissOAuthError: () => void;
 }) {
+  const { t } = useI18n();
   const showOAuthFailure = Boolean(oauthUrlError);
   const envOverride = isRedirectUriEnvOverride();
   const showAccountHint = isAccountOAuthFailure(oauthUrlError);
 
   return (
     <div className="auth-screen">
+      <div className="auth-lang-bar">
+        <LanguageSettings />
+      </div>
       <div className="auth-card config-card">
         <div className="brand-logo">
           Xelto <span className="brand-logo-express">EXPRESS</span>
         </div>
-        <h1>{showOAuthFailure ? 'Błąd logowania UiPath' : 'Fleet Manager'}</h1>
+        <h1>{showOAuthFailure ? t('auth.oauthErrorTitle') : t('auth.title')}</h1>
 
         {showOAuthFailure ? (
           <>
             <p className="config-lead">
-              {showAccountHint
-                ? 'Błąd konta (401) — zalogowane konto nie ma dostępu do organizacji staging lub tenant DefaultTenant.'
-                : 'Logowanie OAuth nie powiodło się. Sprawdź Redirect URI w External Application — musi być identyczny z adresem aplikacji (bez parametrów ?errorCode=).'}
+              {showAccountHint ? t('auth.accountError') : t('auth.oauthFailed')}
             </p>
             <p className="error-text oauth-error-detail">{oauthUrlError}</p>
             {showAccountHint ? (
@@ -313,13 +316,13 @@ export function AuthLoginScreen({
                 disabled={isInitializing}
                 onClick={onDismissOAuthError}
               >
-                {isInitializing ? 'Przekierowanie…' : 'Spróbuj ponownie'}
+                {isInitializing ? t('auth.redirecting') : t('auth.tryAgain')}
               </button>
             </div>
           </>
         ) : (
           <>
-            <p>Zaloguj się do UiPath (staging), aby przeglądać koszty kierowców z Data Fabric.</p>
+            <p>{t('auth.loginLead')}</p>
             {isStudioDesignerPreview() && (
               <p className="error-text">
                 Podgląd w Studio Web ma inny redirect_uri niż hosted app. Otwórz aplikację pod adresem{' '}
@@ -346,7 +349,7 @@ export function AuthLoginScreen({
                 disabled={isInitializing}
                 onClick={onLogin}
               >
-                {isInitializing ? 'Przekierowanie…' : 'Zaloguj'}
+                {isInitializing ? t('auth.redirecting') : t('auth.loginShort')}
               </button>
             </div>
           </>

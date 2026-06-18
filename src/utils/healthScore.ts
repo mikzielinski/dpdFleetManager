@@ -2,11 +2,21 @@ import type { FleetCostStats } from '../services/fleetStats';
 
 export type HealthGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
+export type HealthFactorKey = 'fraud' | 'highCost' | 'volume' | 'compliance' | 'rejected';
+
+export type HealthSummaryKey = 'good' | 'watch' | 'risk';
+
+export interface HealthFactor {
+  key: HealthFactorKey;
+  impact: number;
+  params: Record<string, string | number>;
+}
+
 export interface HealthScoreResult {
   score: number;
   grade: HealthGrade;
-  summary: string;
-  factors: { label: string; impact: number; detail: string }[];
+  summaryKey: HealthSummaryKey;
+  factors: HealthFactor[];
 }
 
 function gradeFromScore(score: number): HealthGrade {
@@ -23,10 +33,10 @@ export interface HealthScoreInput {
   fleetMedianCostPerClaim?: number;
 }
 
-/** 0–100: wyżej = lepiej (mniej fraudów, niższe koszty, compliance OK). */
+/** 0–100: higher = better (fewer fraud flags, lower costs, compliance OK). */
 export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
   const { stats, complianceIssueCount, fleetMedianCostPerClaim } = input;
-  const factors: HealthScoreResult['factors'] = [];
+  const factors: HealthFactor[] = [];
   let score = 100;
 
   const fraudPct = stats.claimCount > 0 ? (stats.flaggedCount / stats.claimCount) * 100 : 0;
@@ -34,9 +44,13 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
     const impact = Math.min(35, Math.round(fraudPct * 0.8));
     score -= impact;
     factors.push({
-      label: 'Oznaczenia / fraud',
+      key: 'fraud',
       impact: -impact,
-      detail: `${stats.flaggedCount} z ${stats.claimCount} rozliczeń (${fraudPct.toFixed(0)}%)`,
+      params: {
+        flagged: stats.flaggedCount,
+        total: stats.claimCount,
+        pct: fraudPct.toFixed(0),
+      },
     });
   }
 
@@ -47,9 +61,9 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
     const impact = Math.min(25, Math.round((ratio - 1) * 20));
     score -= impact;
     factors.push({
-      label: 'Wysoki koszt średni',
+      key: 'highCost',
       impact: -impact,
-      detail: `Średnio ${avg.toFixed(0)} PLN vs mediana floty ${baseline.toFixed(0)} PLN`,
+      params: { avg: avg.toFixed(0), median: baseline.toFixed(0) },
     });
   }
 
@@ -57,9 +71,9 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
     const impact = 15;
     score -= impact;
     factors.push({
-      label: 'Wolumen kosztów',
+      key: 'volume',
       impact: -impact,
-      detail: `${stats.claimCount} rozliczeń, suma ${stats.totalCost.toFixed(0)} PLN`,
+      params: { count: stats.claimCount, total: stats.totalCost.toFixed(0) },
     });
   }
 
@@ -67,9 +81,9 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
     const impact = Math.min(25, complianceIssueCount * 8);
     score -= impact;
     factors.push({
-      label: 'Compliance pojazdu',
+      key: 'compliance',
       impact: -impact,
-      detail: `${complianceIssueCount} nieprawidłowości (badanie / polisy)`,
+      params: { count: complianceIssueCount },
     });
   }
 
@@ -78,22 +92,18 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreResult {
     const impact = 10;
     score -= impact;
     factors.push({
-      label: 'Odrzucone rozliczenia',
+      key: 'rejected',
       impact: -impact,
-      detail: `${rejected.count} odrzuceń`,
+      params: { count: rejected.count },
     });
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   const grade = gradeFromScore(score);
-  const summary =
-    grade === 'A' || grade === 'B'
-      ? 'Akceptowalny profil kosztów i ryzyka'
-      : grade === 'C'
-        ? 'Wymaga monitorowania'
-        : 'Podwyższone ryzyko — zalecana analiza';
+  const summaryKey: HealthSummaryKey =
+    grade === 'A' || grade === 'B' ? 'good' : grade === 'C' ? 'watch' : 'risk';
 
-  return { score, grade, factors, summary };
+  return { score, grade, factors, summaryKey };
 }
 
 export function healthGradeClass(grade: HealthGrade): string {
