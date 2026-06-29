@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PaginationCursor } from '@uipath/uipath-typescript/core';
 import { AuthLoginScreen, BYPASS_AUTH, useAuth } from './hooks/useAuth';
-import { usePolling } from './hooks/usePolling';
 import {
   DETAIL_FIELD_KEYS,
   DETAIL_OPTIONAL_FIELDS,
@@ -53,6 +52,7 @@ import {
   findRecentInstanceForRecord,
   isTerminalStatus,
   pollInstanceVariables,
+  RECENT_INSTANCE_WINDOW_MS,
   resolveMaestroTarget,
   startAnalysis,
   type AnalysisRun,
@@ -93,6 +93,7 @@ import {
   isDriverCorrected,
   isTrustedDriverMessageOrigin,
   parseDriverCorrectionResolved,
+  readRecordStatus,
 } from './utils/driverIntegration';
 import { extractVehicleCompliance } from './utils/vehicleCompliance';
 import {
@@ -100,6 +101,7 @@ import {
   type CompanyFilterState,
 } from './utils/companyFilters';
 import { analysisFromRecord } from './utils/analysisFromRecord';
+import { decisionChipClass, decisionRowClass } from './utils/decisionStatus';
 import { buildInsightRecords } from './utils/insightsEngine';
 import {
   findInvoiceFileField,
@@ -618,6 +620,25 @@ export default function App() {
     [sdk],
   );
 
+  const refreshRecordInTable = useCallback(
+    async (id: string) => {
+      try {
+        const rec = await fetchRecordById(sdk, id);
+        const maps = ctxRef.current?.choiceMaps ?? new Map();
+        const translated = translateRecord(rec, maps);
+        setRecords((prev) =>
+          prev.map((r) => (recordId(r) === id ? translated : r)),
+        );
+        if (activeId === id) {
+          setActiveRecord(translated);
+        }
+      } catch {
+        /* non-fatal — table will refresh on next loadPage */
+      }
+    },
+    [sdk, activeId],
+  );
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -730,14 +751,29 @@ export default function App() {
         ];
       });
 
-      let instanceId: string | undefined;
-      for (let i = 0; i < 12; i++) {
-        await new Promise((r) => setTimeout(r, 2500));
-        instanceId = await findLatestInstance(sdk, maestroTarget, startedAt);
-        if (instanceId) break;
+      let match = await findRecentInstanceForRecord(
+        sdk,
+        maestroTarget,
+        recordId,
+        RECENT_INSTANCE_WINDOW_MS,
+        startedAt,
+      );
+
+      if (!match) {
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 2500));
+          match = await findRecentInstanceForRecord(
+            sdk,
+            maestroTarget,
+            recordId,
+            RECENT_INSTANCE_WINDOW_MS,
+            startedAt,
+          );
+          if (match) break;
+        }
       }
 
-      if (!instanceId) {
+      if (!match) {
         setAnalysisRuns((prev) =>
           prev.filter(
             (r) => !(r.recordIds.includes(recordId) && r.startedAt === startedAt && !r.instanceId),
@@ -750,48 +786,76 @@ export default function App() {
       setAnalysisRuns((prev) =>
         prev.map((r) =>
           r.recordIds.includes(recordId) && r.startedAt === startedAt
-            ? { ...r, instanceId, status: 'running' as const }
+            ? {
+                ...r,
+                instanceId: match.instanceId,
+                status: match.isTerminal ? ('completed' as const) : ('running' as const),
+                variables: match.variables,
+              }
             : r,
         ),
       );
-      setStatusMsg(t('claims.analysisStarted'));
+      if (match.variables) {
+        setStoredResults((prev) => ({ ...prev, [recordId]: match.variables! }));
+      }
+      if (match.isTerminal) {
+        void refreshRecordInTable(recordId);
+      } else {
+        setStatusMsg(t('claims.analysisStarted'));
+      }
     },
-    [sdk, maestroTarget, t],
+    [sdk, maestroTarget, t, refreshRecordInTable],
   );
 
-  const pollTarget = activeRun?.instanceId;
-  const pollFolder = activeRun?.folderKey;
-
-  const pollFetch = useCallback(async () => {
-    if (!pollTarget || !pollFolder) return null;
-    return pollInstanceVariables(sdk, pollTarget, pollFolder);
-  }, [sdk, pollTarget, pollFolder]);
-
-  const { data: polledVars } = usePolling({
-    fetchFn: pollFetch,
-    enabled: !!pollTarget && !!pollFolder && isAuthenticated,
-    interval: 5000,
-    deps: [pollTarget],
-  });
-
   useEffect(() => {
-    if (!polledVars || !activeRun?.instanceId) return;
-    const rid = polledVars.recordId ?? activeRun.recordIds[0];
-    if (rid && (polledVars.fleetManagerNote || polledVars.combinedScore || polledVars.riskLevel)) {
-      setStoredResults((prev) => ({ ...prev, [rid]: polledVars }));
-    }
-    if (isTerminalStatus(polledVars.latestRunStatus ?? polledVars.runStatus)) {
-      setAnalysisRuns((prev) =>
-        prev.map((r) =>
-          r.instanceId === activeRun.instanceId
-            ? { ...r, status: 'completed', variables: polledVars }
-            : r,
-        ),
+    if (!isAuthenticated || !maestroTarget) return;
+
+    const pollRuns = async () => {
+      const running = analysisRuns.filter(
+        (r) => (r.status === 'running' || r.status === 'starting') && r.instanceId,
       );
-      setStatusMsg(t('claims.analysisDone'));
-      if (activeId) void selectRecord(activeId);
-    }
-  }, [polledVars, activeRun, activeId, selectRecord]);
+      if (running.length === 0) return;
+
+      for (const run of running) {
+        try {
+          const vars = await pollInstanceVariables(sdk, run.instanceId!, run.folderKey);
+          const rid = vars.recordId ?? run.recordIds[0];
+          if (rid && (vars.fleetManagerNote || vars.combinedScore || vars.riskLevel)) {
+            setStoredResults((prev) => ({ ...prev, [rid]: vars }));
+          }
+
+          const terminal = isTerminalStatus(vars.latestRunStatus ?? vars.runStatus);
+          if (terminal) {
+            setAnalysisRuns((prev) =>
+              prev.map((r) =>
+                r.instanceId === run.instanceId
+                  ? { ...r, status: 'completed', variables: vars }
+                  : r,
+              ),
+            );
+            setStatusMsg(t('claims.analysisDone'));
+            for (const recordId of run.recordIds) {
+              void refreshRecordInTable(recordId);
+            }
+          } else {
+            setAnalysisRuns((prev) =>
+              prev.map((r) =>
+                r.instanceId === run.instanceId
+                  ? { ...r, status: 'running', variables: vars }
+                  : r,
+              ),
+            );
+          }
+        } catch {
+          /* keep polling */
+        }
+      }
+    };
+
+    void pollRuns();
+    const id = setInterval(() => void pollRuns(), 5000);
+    return () => clearInterval(id);
+  }, [analysisRuns, isAuthenticated, maestroTarget, sdk, t, refreshRecordInTable]);
 
   const activeResults = useMemo(() => {
     if (!activeId) return null;
@@ -808,21 +872,16 @@ export default function App() {
 
   const activeRunStatusForClaim = useMemo(() => {
     if (!activeRunForClaim) return undefined;
-    if (activeRun?.recordIds.includes(activeId ?? '') && polledVars?.latestRunStatus) {
-      return polledVars.latestRunStatus;
-    }
-    return activeRunForClaim.variables?.latestRunStatus ?? activeRunForClaim.status;
-  }, [activeRunForClaim, activeRun, activeId, polledVars]);
+    return (
+      activeRunForClaim.variables?.latestRunStatus ??
+      activeRunForClaim.status
+    );
+  }, [activeRunForClaim]);
 
   useEffect(() => {
     if (!activeId || !activeRecord || !maestroTarget || !isAuthenticated) return;
     if (!isDriverCorrected(activeRecord)) return;
     if (driverCorrectedAutoStartRef.current.has(activeId)) return;
-
-    const fromRecord = analysisFromRecord(activeRecord, activeVehicleFlag);
-    if (fromRecord?.combinedScore || fromRecord?.fleetManagerNote || fromRecord?.riskLevel) {
-      return;
-    }
 
     const existingRun = analysisRuns.find((r) => r.recordIds.includes(activeId));
     if (
@@ -859,9 +918,16 @@ export default function App() {
           if (recent.variables) {
             setStoredResults((prev) => ({ ...prev, [activeId]: recent.variables! }));
           }
-          if (!recent.isTerminal) {
+          if (recent.isTerminal) {
+            void refreshRecordInTable(activeId);
+          } else {
             setStatusMsg(t('claims.analysisStarted'));
           }
+          return;
+        }
+
+        const fromRecord = analysisFromRecord(activeRecord, activeVehicleFlag);
+        if (fromRecord?.combinedScore || fromRecord?.fleetManagerNote || fromRecord?.riskLevel) {
           return;
         }
 
@@ -880,7 +946,90 @@ export default function App() {
     analysisRuns,
     sdk,
     t,
+    refreshRecordInTable,
   ]);
+
+  useEffect(() => {
+    if (!maestroTarget || !isAuthenticated || records.length === 0) return;
+
+    const discoverExternalRuns = async () => {
+      const candidates = records
+        .filter((r) => {
+          const id = recordId(r);
+          if (!id || !isDriverCorrected(r)) return false;
+          const tracked = analysisRuns.find((run) => run.recordIds.includes(id));
+          if (tracked && (tracked.status === 'running' || tracked.status === 'starting')) {
+            return false;
+          }
+          return true;
+        })
+        .slice(0, 8);
+
+      for (const row of candidates) {
+        const id = recordId(row);
+        if (!id) continue;
+        try {
+          const recent = await findRecentInstanceForRecord(sdk, maestroTarget, id);
+          if (!recent) continue;
+
+          setAnalysisRuns((prev) => {
+            if (prev.some((r) => r.recordIds.includes(id) && r.instanceId === recent.instanceId)) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                recordIds: [id],
+                instanceId: recent.instanceId,
+                folderKey: maestroTarget.folderKey,
+                startedAt: recent.startedAt,
+                status: recent.isTerminal ? ('completed' as const) : ('running' as const),
+                variables: recent.variables,
+              },
+            ];
+          });
+          if (recent.variables) {
+            setStoredResults((prev) => ({ ...prev, [id]: recent.variables! }));
+          }
+          if (recent.isTerminal) {
+            void refreshRecordInTable(id);
+          } else {
+            setStatusMsg(t('claims.analysisStarted'));
+          }
+        } catch {
+          /* try next record */
+        }
+      }
+    };
+
+    void discoverExternalRuns();
+    const intervalId = setInterval(() => void discoverExternalRuns(), 20_000);
+    return () => clearInterval(intervalId);
+  }, [records, maestroTarget, isAuthenticated, analysisRuns, sdk, t, refreshRecordInTable]);
+
+  useEffect(() => {
+    if (mainSection !== 'claims' || !isAuthenticated) return;
+
+    const refreshVisibleDecisions = async () => {
+      for (const row of displayRecords) {
+        const id = recordId(row);
+        if (!id) continue;
+        const status = readRecordStatus(row).toLowerCase();
+        const tracked = analysisRuns.find((run) => run.recordIds.includes(id));
+        const needsRefresh =
+          /action required|driver corrected|under review|flagged|pending|approved|rejected/i.test(
+            status,
+          ) ||
+          tracked?.status === 'running' ||
+          tracked?.status === 'starting';
+        if (!needsRefresh) continue;
+        await refreshRecordInTable(id);
+      }
+    };
+
+    const intervalId = setInterval(() => void refreshVisibleDecisions(), 30_000);
+    return () => clearInterval(intervalId);
+  }, [mainSection, isAuthenticated, displayRecords, analysisRuns, refreshRecordInTable]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {
@@ -1194,7 +1343,7 @@ export default function App() {
           <span>
             {t('claims.analysisProgress', {
               id: activeRun.instanceId?.slice(0, 8) ?? '…',
-              status: polledVars?.latestRunStatus ?? 'Running',
+              status: activeRun.variables?.latestRunStatus ?? 'Running',
             })}
           </span>
         </div>
@@ -1462,12 +1611,10 @@ export default function App() {
                       displayRecords.map((r) => {
                         const id = recordId(r);
                         const selected = id === activeId;
-                        const awaitingDriver = isAwaitingDriverCorrection(r);
-                        const driverCorrected = isDriverCorrected(r);
+                        const decisionLabel = readRecordStatus(r);
                         const rowClass = [
                           selected ? 'row-active' : '',
-                          awaitingDriver ? 'row-awaiting-driver' : '',
-                          driverCorrected ? 'row-driver-corrected' : '',
+                          decisionRowClass(decisionLabel),
                         ]
                           .filter(Boolean)
                           .join(' ');
@@ -1487,15 +1634,7 @@ export default function App() {
                             {displayTableColumns.map((c) => (
                               <td key={c.key}>
                                 {c.key === 'decision' ? (
-                                  <span
-                                    className={[
-                                      'status-chip',
-                                      awaitingDriver ? 'status-chip--action' : '',
-                                      driverCorrected ? 'status-chip--corrected' : '',
-                                    ]
-                                      .filter(Boolean)
-                                      .join(' ')}
-                                  >
+                                  <span className={decisionChipClass(decisionLabel)}>
                                     {displayField(r, c)}
                                   </span>
                                 ) : (

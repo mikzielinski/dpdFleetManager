@@ -754,12 +754,34 @@ tbody tr:hover {
   color: #2e7d32;
 }
 
-.row-awaiting-driver {
+.row-awaiting-driver,
+.row-decision-action {
   background: #fff8e1 !important;
 }
 
-.row-driver-corrected {
+.row-driver-corrected,
+.row-decision-corrected {
   background: #e8f5e9 !important;
+}
+
+.row-decision-approved {
+  background: #e8f5e9 !important;
+}
+
+.row-decision-rejected {
+  background: #ffebee !important;
+}
+
+.row-decision-flagged {
+  background: #fff3e0 !important;
+}
+
+.row-decision-pending {
+  background: #f3e5f5 !important;
+}
+
+.row-decision-review {
+  background: #e3f2fd !important;
 }
 
 .status-chip {
@@ -768,6 +790,8 @@ tbody tr:hover {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
+  background: #eceff1;
+  color: #455a64;
 }
 
 .status-chip--action {
@@ -778,6 +802,31 @@ tbody tr:hover {
 .status-chip--corrected {
   background: #a5d6a7;
   color: #1b5e20;
+}
+
+.status-chip--approved {
+  background: #c8e6c9;
+  color: #1b5e20;
+}
+
+.status-chip--rejected {
+  background: #ef9a9a;
+  color: #b71c1c;
+}
+
+.status-chip--flagged {
+  background: #ffcc80;
+  color: #e65100;
+}
+
+.status-chip--pending {
+  background: #e1bee7;
+  color: #6a1b9a;
+}
+
+.status-chip--review {
+  background: #90caf9;
+  color: #0d47a1;
 }
 
 .action-buttons {

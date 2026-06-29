@@ -242,6 +242,7 @@ export async function findRecentInstanceForRecord(
   target: MaestroTarget,
   recordId: string,
   windowMs = RECENT_INSTANCE_WINDOW_MS,
+  afterMs?: number,
 ): Promise<RecentInstanceMatch | null> {
   if (!recordId.trim()) return null;
 
@@ -269,8 +270,12 @@ export async function findRecentInstanceForRecord(
     pageSize: 30,
   });
   const cutoff = Date.now() - windowMs;
+  const minStart = afterMs != null ? afterMs - 5000 : cutoff;
   const candidates = result.items
-    .filter((i) => new Date(i.startedTime).getTime() >= cutoff)
+    .filter((i) => {
+      const started = new Date(i.startedTime).getTime();
+      return started >= cutoff && started >= minStart;
+    })
     .sort((a, b) => new Date(b.startedTime).getTime() - new Date(a.startedTime).getTime());
 
   for (const inst of candidates) {
