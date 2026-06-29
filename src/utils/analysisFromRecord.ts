@@ -20,6 +20,7 @@ export function analysisFromRecord(
   let combinedScore = pickField(record, 'combinedScore', 'CombinedScore');
   let riskLevel = pickField(record, 'riskLevel', 'RiskLevel');
   let flagType = pickField(record, 'flagType', 'FlagType');
+  const fraudFlag = pickField(record, 'fraudFlag', 'FraudFlag');
 
   const decision = pickField(record, 'decision', 'Status');
   const net = pickField(record, 'netPrice', 'NetPrice');
@@ -53,7 +54,8 @@ export function analysisFromRecord(
     !hasText(fleetManagerNote) &&
     !hasText(combinedScore) &&
     !hasText(riskLevel) &&
-    !hasText(flagType)
+    !hasText(flagType) &&
+    !hasText(fraudFlag)
   ) {
     return null;
   }
@@ -66,6 +68,7 @@ export function analysisFromRecord(
     combinedScore: hasText(combinedScore) ? combinedScore : undefined,
     riskLevel: hasText(riskLevel) ? riskLevel : undefined,
     flagType: hasText(flagType) ? flagType : undefined,
+    fraudFlag: hasText(fraudFlag) ? fraudFlag : undefined,
     decision: hasText(decision) ? decision : undefined,
     vehicleReg: hasText(vehicle) ? vehicle : undefined,
     declaredAmount: hasText(amount) ? `${amount} PLN` : undefined,

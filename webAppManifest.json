@@ -3,6 +3,7 @@
   "solutionResourceSubType": "Coded",
   "config": {
     "isCompiled": true,
-    "isActionApp": false
+    "isActionApp": false,
+    "bundlePath": "dist"
   }
 }

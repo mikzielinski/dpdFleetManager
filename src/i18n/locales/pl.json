@@ -114,6 +114,7 @@
       "analysisProgress": "Analiza w toku (instancja {id}) — {status}",
       "analysisStarted": "Analiza uruchomiona — śledzenie postępu…",
       "analysisDone": "Analiza zakończona.",
+      "analysisDiscoverFailed": "Nie znaleziono instancji Maestro — odśwież za chwilę lub uruchom analizę ręcznie.",
       "invoiceMissing": "Nie znaleziono załącznika (pole Invoice File / InvoiceFile w Data Fabric).",
       "invoiceDefaultName": "faktura.pdf"
     },
@@ -302,7 +303,9 @@
       "vehicle": "Pojazd",
       "anomaly": "Wykryta anomalia",
       "autoDecision": "Decyzja automatyczna:",
-      "validation": "Walidacja faktury:"
+      "validation": "Walidacja faktury:",
+      "runStatus": "Status analizy: {status}",
+      "fraudFlag": "Flaga fraud:"
     },
     "pager": {
       "previous": "← Poprzednia",

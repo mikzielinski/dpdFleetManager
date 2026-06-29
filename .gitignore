@@ -18,6 +18,8 @@ dist/
 .uipath/verify/
 .uipath/nupkg-inspect/
 .uipath/*.zip
+.push-dist/
+push-dist/
 
 # OS / IDE
 .DS_Store

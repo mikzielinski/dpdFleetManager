@@ -7,13 +7,15 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const pkgId = 'DPDCarInvestigator.AppV2.DPDAppMonitor';
-const ver = process.argv[2] || '1.0.5';
+const cfg = JSON.parse(fs.readFileSync(path.join(root, '.uipath/deploy-config.staging.json'), 'utf8'));
+const pkgId = cfg.packageId || 'DPDCarInvestigator.AppV2.DPDAppMonitor';
+const ver = process.argv[2] || JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const distDir = path.join(root, 'dist');
 const outDir = path.join(root, '.uipath');
 const templateDir = path.join(outDir, 'nupkg-inspect', 'content');
-const STUDIO_PROJECT_ID = process.env.STUDIO_PROJECT_ID || '28ac09c2-3a5c-4ba8-a78c-80883f38e6b5';
-const OAUTH_CLIENT_ID = '98aa3ef7-06e0-431b-9997-1963d708bd45';
+const STUDIO_PROJECT_ID = process.env.STUDIO_PROJECT_ID || cfg.studioProjectId || '28ac09c2-3a5c-4ba8-a78c-80883f38e6b5';
+const OAUTH_CLIENT_ID = cfg.oauthClientId || '98aa3ef7-06e0-431b-9997-1963d708bd45';
+const hostedBase = (cfg.hostedBaseUrl || 'https://mzpocevylrxu.staging.uipath.host/dpdmonitoring').replace(/\/?$/, '');
 const DEFAULT_SCOPE = JSON.parse(
   fs.readFileSync(path.join(root, 'uipath.json'), 'utf8'),
 ).scope;
@@ -71,12 +73,13 @@ fs.writeFileSync(
   path.join(distDir, 'uipath.json'),
   JSON.stringify(
     {
+      packageName: pkgId,
       scope: process.env.VITE_UIPATH_SCOPE || DEFAULT_SCOPE,
       clientId: OAUTH_CLIENT_ID,
-      orgName: 'mzpocevylrxu',
-      tenantName: 'DefaultTenant',
-      baseUrl: 'https://staging.api.uipath.com',
-      redirectUri: 'https://mzpocevylrxu.staging.uipath.host/dpdmonitoring',
+      orgName: cfg.orgName || 'mzpocevylrxu',
+      tenantName: cfg.tenantName || 'DefaultTenant',
+      baseUrl: `https://${cfg.apiHost || 'staging.api.uipath.com'}`,
+      redirectUri: hostedBase,
     },
     null,
     2,

@@ -50,6 +50,7 @@ import {
 } from './utils/filterRecords';
 import {
   findLatestInstance,
+  findRecentInstanceForRecord,
   isTerminalStatus,
   pollInstanceVariables,
   resolveMaestroTarget,
@@ -207,6 +208,7 @@ export default function App() {
   }, [globalFilterActive, filteredRecords, pageIndex]);
 
   const prevGlobalFilterRef = useRef(false);
+  const driverCorrectedAutoStartRef = useRef<Set<string>>(new Set());
 
   const serviceOptions = useMemo(() => {
     const col = tableColumns.find((c) => c.key === 'serviceName');
@@ -705,6 +707,58 @@ export default function App() {
     }
   };
 
+  const attachAnalysisPolling = useCallback(
+    async (recordId: string, startedAfterMs?: number) => {
+      if (!maestroTarget) return;
+      const startedAt = startedAfterMs ?? Date.now() - 120_000;
+
+      setAnalysisRuns((prev) => {
+        const already = prev.some(
+          (r) =>
+            r.recordIds.includes(recordId) &&
+            (r.status === 'running' || r.status === 'starting'),
+        );
+        if (already) return prev;
+        return [
+          ...prev,
+          {
+            recordIds: [recordId],
+            folderKey: maestroTarget.folderKey,
+            startedAt,
+            status: 'starting' as const,
+          },
+        ];
+      });
+
+      let instanceId: string | undefined;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        instanceId = await findLatestInstance(sdk, maestroTarget, startedAt);
+        if (instanceId) break;
+      }
+
+      if (!instanceId) {
+        setAnalysisRuns((prev) =>
+          prev.filter(
+            (r) => !(r.recordIds.includes(recordId) && r.startedAt === startedAt && !r.instanceId),
+          ),
+        );
+        setStatusMsg(t('claims.analysisDiscoverFailed'));
+        return;
+      }
+
+      setAnalysisRuns((prev) =>
+        prev.map((r) =>
+          r.recordIds.includes(recordId) && r.startedAt === startedAt
+            ? { ...r, instanceId, status: 'running' as const }
+            : r,
+        ),
+      );
+      setStatusMsg(t('claims.analysisStarted'));
+    },
+    [sdk, maestroTarget, t],
+  );
+
   const pollTarget = activeRun?.instanceId;
   const pollFolder = activeRun?.folderKey;
 
@@ -746,6 +800,87 @@ export default function App() {
     if (!activeRecord) return null;
     return analysisFromRecord(activeRecord, activeVehicleFlag);
   }, [activeId, storedResults, activeRecord, activeVehicleFlag]);
+
+  const activeRunForClaim = useMemo(() => {
+    if (!activeId) return null;
+    return analysisRuns.find((r) => r.recordIds.includes(activeId));
+  }, [analysisRuns, activeId]);
+
+  const activeRunStatusForClaim = useMemo(() => {
+    if (!activeRunForClaim) return undefined;
+    if (activeRun?.recordIds.includes(activeId ?? '') && polledVars?.latestRunStatus) {
+      return polledVars.latestRunStatus;
+    }
+    return activeRunForClaim.variables?.latestRunStatus ?? activeRunForClaim.status;
+  }, [activeRunForClaim, activeRun, activeId, polledVars]);
+
+  useEffect(() => {
+    if (!activeId || !activeRecord || !maestroTarget || !isAuthenticated) return;
+    if (!isDriverCorrected(activeRecord)) return;
+    if (driverCorrectedAutoStartRef.current.has(activeId)) return;
+
+    const fromRecord = analysisFromRecord(activeRecord, activeVehicleFlag);
+    if (fromRecord?.combinedScore || fromRecord?.fleetManagerNote || fromRecord?.riskLevel) {
+      return;
+    }
+
+    const existingRun = analysisRuns.find((r) => r.recordIds.includes(activeId));
+    if (
+      existingRun &&
+      (existingRun.status === 'starting' ||
+        existingRun.status === 'running' ||
+        (existingRun.status === 'completed' && existingRun.instanceId))
+    ) {
+      return;
+    }
+
+    driverCorrectedAutoStartRef.current.add(activeId);
+
+    void (async () => {
+      try {
+        const recent = await findRecentInstanceForRecord(sdk, maestroTarget, activeId);
+        if (recent) {
+          setAnalysisRuns((prev) => {
+            if (prev.some((r) => r.recordIds.includes(activeId) && r.instanceId === recent.instanceId)) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                recordIds: [activeId],
+                instanceId: recent.instanceId,
+                folderKey: maestroTarget.folderKey,
+                startedAt: recent.startedAt,
+                status: recent.isTerminal ? ('completed' as const) : ('running' as const),
+                variables: recent.variables,
+              },
+            ];
+          });
+          if (recent.variables) {
+            setStoredResults((prev) => ({ ...prev, [activeId]: recent.variables! }));
+          }
+          if (!recent.isTerminal) {
+            setStatusMsg(t('claims.analysisStarted'));
+          }
+          return;
+        }
+
+        await runAnalysis([activeId]);
+      } catch (e) {
+        driverCorrectedAutoStartRef.current.delete(activeId);
+        setStatusMsg(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [
+    activeId,
+    activeRecord,
+    activeVehicleFlag,
+    maestroTarget,
+    isAuthenticated,
+    analysisRuns,
+    sdk,
+    t,
+  ]);
 
   const detailContext = useMemo((): DetailEnrichmentContext => {
     return {
@@ -860,19 +995,20 @@ export default function App() {
           {
             id: alertId,
             recordId,
-            message: `Kierowca poprawił zgłoszenie ${recordId.slice(0, 8)}… — status: Driver Corrected`,
+            message: t('banner.driverAlert', { id: recordId.slice(0, 8) }),
             at: new Date().toLocaleString(fmt),
           },
           ...prev.slice(0, 4),
         ]);
-        setStatusMsg(`Kierowca zaktualizował zgłoszenie — oznaczono jako „Driver Corrected”.`);
+        setStatusMsg(t('banner.driverCorrected'));
         await loadPage(undefined, true);
         await selectRecord(recordId);
+        void attachAnalysisPolling(recordId, Date.now() - 30_000);
       } catch (e) {
         setStatusMsg(e instanceof Error ? e.message : String(e));
       }
     },
-    [sdk, loadPage, selectRecord],
+    [sdk, loadPage, selectRecord, attachAnalysisPolling, t, fmt],
   );
 
   useEffect(() => {
@@ -1480,7 +1616,10 @@ export default function App() {
                     carRegistration={pickField(activeRecord, 'carRegistration')}
                   />
 
-                  <AnalysisResults results={activeResults} />
+                  <AnalysisResults
+                    results={activeResults}
+                    runStatus={activeRunStatusForClaim}
+                  />
 
                   <div className="decision-hint">
                     <p className="section-sub">{t('claims.managerDecision')}</p>

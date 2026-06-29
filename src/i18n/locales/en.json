@@ -114,6 +114,7 @@
       "analysisProgress": "Analysis in progress (instance {id}) — {status}",
       "analysisStarted": "Analysis started — tracking progress…",
       "analysisDone": "Analysis completed.",
+      "analysisDiscoverFailed": "Maestro instance not found — refresh shortly or run analysis manually.",
       "invoiceMissing": "Attachment not found (Invoice File / InvoiceFile field in Data Fabric).",
       "invoiceDefaultName": "invoice.pdf"
     },
@@ -302,7 +303,9 @@
       "vehicle": "Vehicle",
       "anomaly": "Detected anomaly",
       "autoDecision": "Automatic decision:",
-      "validation": "Invoice validation:"
+      "validation": "Invoice validation:",
+      "runStatus": "Analysis status: {status}",
+      "fraudFlag": "Fraud flag:"
     },
     "pager": {
       "previous": "← Previous",

@@ -35,7 +35,22 @@ export const MAESTRO_PROCESS_CANDIDATES = [
   'Agentic.Process',
 ];
 
-export const MAESTRO_FOLDER_PATH = 'Shared/DPDDataInvestigator';
+export const MAESTRO_FOLDER_PATH =
+  import.meta.env.VITE_MAESTRO_FOLDER_PATH?.trim() || 'Shared/DPDDataInvestigator 29';
+
+export const MAESTRO_FOLDER_KEY =
+  import.meta.env.VITE_MAESTRO_FOLDER_KEY?.trim() || '5266330f-6d76-4cfa-a318-4cf18e02c8d3';
+
+export const MAESTRO_RELEASE_KEY =
+  import.meta.env.VITE_MAESTRO_RELEASE_KEY?.trim() || '6a044bd0-c1ea-4953-a292-653380fff89c';
+
+export const MAESTRO_FOLDER_PATH_CANDIDATES = [
+  ...new Set([
+    MAESTRO_FOLDER_PATH,
+    'Shared/DPDDataInvestigator 29',
+    'Shared/DPDDataInvestigator',
+  ]),
+];
 
 /** Start event input for Agentic Process BPMN */
 export const MAESTRO_INPUT_RECORD_ARG = 'InRecord_Id';

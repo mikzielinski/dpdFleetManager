@@ -28,6 +28,10 @@ import {
   type DpdRecord,
 } from '../utils/record';
 import {
+  isAnalysisTerminalStatus,
+  readRecordStatus,
+} from '../utils/driverIntegration';
+import {
   BYPASS_AUTH,
   DEMO_INVOICE_PDF,
   getAllMockRecords,
@@ -327,6 +331,11 @@ export async function markDriverCorrectionReceived(
 ): Promise<void> {
   if (BYPASS_AUTH) {
     await Promise.resolve();
+    return;
+  }
+
+  const current = readRecordStatus(await fetchRecordById(sdk, recordId));
+  if (isAnalysisTerminalStatus(current)) {
     return;
   }
 

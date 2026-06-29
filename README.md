@@ -72,6 +72,26 @@ uip login --organization mzpocevylrxu --tenant DefaultTenant
 | Folder | `Shared/DPDCarInvestigator` |
 | Package / routing | `DPDCarInvestigator.AppV2.DPDAppMonitor` -> `/dpdmonitoring/` |
 
+## Maestro integration (v2.2.2)
+
+Targets the canonical **DPD Data Investigator** solution on Orchestrator folder **29**:
+
+| Setting | Value |
+|---------|--------|
+| Folder path | `Shared/DPDDataInvestigator 29` |
+| Folder key | `5266330f-6d76-4cfa-a318-4cf18e02c8d3` |
+| Release key | `6a044bd0-c1ea-4953-a292-653380fff89c` |
+| Process | `DPDDataInvestigator.agentic.Agentic.Process` |
+| Input argument | `InRecord_Id` |
+
+**Behaviour:**
+
+- **Start analysis** — `startAnalysis()` from the record detail panel.
+- **Auto-resume after driver correction** — `findRecentInstanceForRecord()` polls recent Maestro instances for the active record (30 min window) so results appear without manual re-run when the driver saves a correction.
+- **Driver Corrected** — `markDriverCorrectionReceived()` skips overwriting terminal statuses (`Approved`, `Rejected`, `Under Review`, `Flagged`) already set by Maestro.
+
+Maestro solution source: [DPDAgent](https://github.com/mikzielinski/DPDAgent).
+
 ## Licencja
 
 Projekt wewnętrzny DPD / UiPath. Szczegóły u właściciela repozytorium.

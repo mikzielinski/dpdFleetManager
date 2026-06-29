@@ -6,9 +6,10 @@ interface Props {
   results: AnalysisVariables | null;
   title?: string;
   showEmpty?: boolean;
+  runStatus?: string;
 }
 
-export function AnalysisResults({ results, title, showEmpty = true }: Props) {
+export function AnalysisResults({ results, title, showEmpty = true, runStatus }: Props) {
   const { t } = useI18n();
   const panelTitle = title ?? t('analysis.title');
 
@@ -26,7 +27,14 @@ export function AnalysisResults({ results, title, showEmpty = true }: Props) {
 
   return (
     <section className="analysis-panel">
-      <h3 className="section-title">{panelTitle}</h3>
+      <div className="analysis-panel-head">
+        <h3 className="section-title">{panelTitle}</h3>
+        {runStatus && (
+          <span className="badge badge-muted analysis-run-badge" title={runStatus}>
+            {t('analysis.runStatus', { status: runStatus })}
+          </span>
+        )}
+      </div>
 
       {results.fleetManagerNote && (
         <div
@@ -63,6 +71,12 @@ export function AnalysisResults({ results, title, showEmpty = true }: Props) {
           <h4 className="section-sub">{t('analysis.anomaly')}</h4>
           <p className="anomaly-flag">{results.flagType}</p>
         </>
+      )}
+
+      {results.fraudFlag && (
+        <p className="meta-line">
+          <strong>{t('analysis.fraudFlag')}</strong> {results.fraudFlag}
+        </p>
       )}
 
       {results.decision && (

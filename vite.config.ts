@@ -23,6 +23,13 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        // UiPath codedapp push rejects filenames containing ".es." (e.g. index.es-*.js)
+        chunkFileNames: 'assets/chunk-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
   },
   server: {
     port: 5173,

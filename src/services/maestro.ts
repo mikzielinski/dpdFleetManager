@@ -47,6 +47,7 @@ export interface AnalysisVariables {
   riskLevel?: string;
   decision?: string;
   flagType?: string;
+  fraudFlag?: string;
   vehicleReg?: string;
   declaredAmount?: string;
   validationStatus?: string;
@@ -217,4 +218,80 @@ export function isTerminalStatus(status?: string): boolean {
   if (!status) return false;
   const s = status.toLowerCase();
   return ['completed', 'faulted', 'canceled', 'cancelled', 'terminated'].some((x) => s.includes(x));
+}
+
+/** Skip auto-start when a matching instance ran within this window. */
+export const RECENT_INSTANCE_WINDOW_MS = 30 * 60 * 1000;
+
+export interface RecentInstanceMatch {
+  instanceId: string;
+  startedAt: number;
+  latestRunStatus?: string;
+  variables?: AnalysisVariables;
+  isTerminal: boolean;
+}
+
+function instanceMatchesRecord(vars: AnalysisVariables, recordId: string): boolean {
+  const rid = (vars.recordId ?? '').trim().toLowerCase();
+  return rid === recordId.trim().toLowerCase();
+}
+
+/** Find a recent Maestro instance started for this InRecord_Id (Running or Completed). */
+export async function findRecentInstanceForRecord(
+  sdk: UiPath,
+  target: MaestroTarget,
+  recordId: string,
+  windowMs = RECENT_INSTANCE_WINDOW_MS,
+): Promise<RecentInstanceMatch | null> {
+  if (!recordId.trim()) return null;
+
+  if (BYPASS_AUTH) {
+    await Promise.resolve();
+    const run = demoRuns
+      .filter((r) => r.recordId === recordId && Date.now() - r.startedAt < windowMs)
+      .sort((a, b) => b.startedAt - a.startedAt)[0];
+    if (!run) return null;
+    const complete = Date.now() - run.startedAt >= DEMO_ANALYSIS_MS;
+    const variables = analysisVariablesForRecord(recordId, complete);
+    const status = variables.latestRunStatus;
+    return {
+      instanceId: run.instanceId,
+      startedAt: run.startedAt,
+      latestRunStatus: status,
+      variables,
+      isTerminal: isTerminalStatus(status),
+    };
+  }
+
+  const processInstances = new ProcessInstances(sdk);
+  const result = await processInstances.getAll({
+    processKey: target.processKey,
+    pageSize: 30,
+  });
+  const cutoff = Date.now() - windowMs;
+  const candidates = result.items
+    .filter((i) => new Date(i.startedTime).getTime() >= cutoff)
+    .sort((a, b) => new Date(b.startedTime).getTime() - new Date(a.startedTime).getTime());
+
+  for (const inst of candidates) {
+    try {
+      const vars = await pollInstanceVariables(sdk, inst.instanceId, target.folderKey);
+      if (!instanceMatchesRecord(vars, recordId)) continue;
+
+      const status = vars.latestRunStatus ?? inst.latestRunStatus;
+      const isTerminal = isTerminalStatus(status);
+      if (isTerminal && status?.toLowerCase().includes('fault')) continue;
+
+      return {
+        instanceId: inst.instanceId,
+        startedAt: new Date(inst.startedTime).getTime(),
+        latestRunStatus: status,
+        variables: vars,
+        isTerminal,
+      };
+    } catch {
+      // try next instance
+    }
+  }
+  return null;
 }

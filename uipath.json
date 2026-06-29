@@ -1,4 +1,5 @@
 {
+  "packageName": "DPDCarInvestigator.AppV2.DPDAppMonitor",
   "scope": "DataFabric.Schema.Read DataFabric.Data.Read DataFabric.Data.Write PIMS OR.Execution OR.Jobs OR.Folders.Read",
   "clientId": "98aa3ef7-06e0-431b-9997-1963d708bd45",
   "orgName": "mzpocevylrxu",

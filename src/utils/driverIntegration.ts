@@ -5,6 +5,19 @@ import {
   DRIVER_CORRECTED_STATUS,
 } from '../config';
 
+/** Status values set by Maestro / manager after analysis — do not overwrite with Driver Corrected. */
+export const ANALYSIS_TERMINAL_STATUSES = new Set([
+  'approved',
+  'rejected',
+  'under review',
+  'flagged',
+]);
+
+export function isAnalysisTerminalStatus(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return ANALYSIS_TERMINAL_STATUSES.has(normalized);
+}
+
 export interface DriverCorrectionResolvedEvent {
   recordId: string;
   status?: string;
