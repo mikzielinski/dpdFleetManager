@@ -112,6 +112,8 @@
       "noFilterMatchGlobal": "Brak wierszy spełniających filtry (przeszukano {count} rekordów w bazie).",
       "noFilterMatchPage": "Brak wierszy spełniających filtry ({count} rekordów na stronie).",
       "analysisProgress": "Analiza w toku (instancja {id}) — {status}",
+      "analysisProgressMultiple": "Analiza w toku ({count} przypadków) — kliknij, aby wybrać",
+      "runningCasesTitle": "Aktywne analizy",
       "analysisStarted": "Analiza uruchomiona — śledzenie postępu…",
       "analysisDone": "Analiza zakończona.",
       "analysisDiscoverFailed": "Nie znaleziono instancji Maestro — odśwież za chwilę lub uruchom analizę ręcznie.",

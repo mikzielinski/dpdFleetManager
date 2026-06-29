@@ -162,6 +162,7 @@ export default function App() {
   const [driverAlerts, setDriverAlerts] = useState<
     Array<{ id: string; recordId: string; message: string; at: string }>
   >([]);
+  const [runningRunsModalOpen, setRunningRunsModalOpen] = useState(false);
 
   const [vehicleHistory, setVehicleHistory] = useState<VehicleFlagHistoryItem[]>([]);
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
@@ -392,8 +393,23 @@ export default function App() {
     );
   }, [activeVehicle, allPocCosts, vehicleCatalog]);
 
-  const activeRun = analysisRuns.find(
-    (r) => r.status === 'running' || r.status === 'starting',
+  const runningRuns = useMemo(
+    () => analysisRuns.filter((r) => r.status === 'running' || r.status === 'starting'),
+    [analysisRuns],
+  );
+
+  const runRecordLabel = useCallback(
+    (id: string) => {
+      const rec =
+        records.find((r) => recordId(r) === id) ?? (activeId === id ? activeRecord : null);
+      if (!rec) return id.slice(0, 8);
+      const plate = pickField(rec, 'carRegistration');
+      const service = pickField(rec, 'serviceName');
+      if (plate !== '—' && service !== '—') return `${plate} · ${service}`;
+      if (plate !== '—') return plate;
+      return id.slice(0, 8);
+    },
+    [records, activeId, activeRecord],
   );
 
   const loadPage = useCallback(
@@ -639,6 +655,55 @@ export default function App() {
     [sdk, activeId],
   );
 
+  const refreshCaseAfterAnalysis = useCallback(
+    async (id: string, latestVars?: AnalysisVariables) => {
+      try {
+        const rec = await fetchRecordById(sdk, id);
+        const maps = ctxRef.current?.choiceMaps ?? new Map();
+        const translated = translateRecord(rec, maps);
+        setRecords((prev) =>
+          prev.map((r) => (recordId(r) === id ? translated : r)),
+        );
+
+        const carReg = pickField(translated, 'carRegistration');
+        let linkedFlag: VehicleFlagHistoryItem | null = null;
+        try {
+          linkedFlag = await fetchVehicleFlagForCostRecord(
+            sdk,
+            id,
+            carReg !== '—' ? carReg : undefined,
+          );
+        } catch {
+          linkedFlag = null;
+        }
+
+        const fromRecord = analysisFromRecord(translated, linkedFlag);
+        const statusLabel = readRecordStatus(translated);
+        if (fromRecord || latestVars) {
+          setStoredResults((prev) => ({
+            ...prev,
+            [id]: {
+              ...(fromRecord ?? {}),
+              ...(latestVars ?? {}),
+              decision:
+                statusLabel !== '—'
+                  ? statusLabel
+                  : latestVars?.decision ?? fromRecord?.decision,
+            },
+          }));
+        }
+
+        if (activeId === id) {
+          setActiveRecord(translated);
+          setActiveVehicleFlag(linkedFlag);
+        }
+      } catch {
+        /* non-fatal — table will refresh on next loadPage */
+      }
+    },
+    [sdk, activeId],
+  );
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -799,12 +864,12 @@ export default function App() {
         setStoredResults((prev) => ({ ...prev, [recordId]: match.variables! }));
       }
       if (match.isTerminal) {
-        void refreshRecordInTable(recordId);
+        void refreshCaseAfterAnalysis(recordId, match.variables);
       } else {
         setStatusMsg(t('claims.analysisStarted'));
       }
     },
-    [sdk, maestroTarget, t, refreshRecordInTable],
+    [sdk, maestroTarget, t, refreshCaseAfterAnalysis],
   );
 
   useEffect(() => {
@@ -834,8 +899,8 @@ export default function App() {
               ),
             );
             setStatusMsg(t('claims.analysisDone'));
-            for (const recordId of run.recordIds) {
-              void refreshRecordInTable(recordId);
+            for (const rid of run.recordIds) {
+              void refreshCaseAfterAnalysis(rid, vars);
             }
           } else {
             setAnalysisRuns((prev) =>
@@ -855,7 +920,7 @@ export default function App() {
     void pollRuns();
     const id = setInterval(() => void pollRuns(), 5000);
     return () => clearInterval(id);
-  }, [analysisRuns, isAuthenticated, maestroTarget, sdk, t, refreshRecordInTable]);
+  }, [analysisRuns, isAuthenticated, maestroTarget, sdk, t, refreshCaseAfterAnalysis]);
 
   const activeResults = useMemo(() => {
     if (!activeId) return null;
@@ -1076,6 +1141,7 @@ export default function App() {
       invoiceLoading;
 
     return DETAIL_FIELD_KEYS.filter((key) => {
+      if (key === 'fleetManagerNote') return false;
       if (key === 'invoiceFileName') {
         return hasInvoiceAttachment && (!!invoiceBlob || invoiceLoading);
       }
@@ -1098,6 +1164,25 @@ export default function App() {
   const onRowClick = (r: DpdRecord) => {
     const id = recordId(r);
     if (id) void selectRecord(id);
+  };
+
+  const openRunningCase = useCallback(
+    (id: string) => {
+      setRunningRunsModalOpen(false);
+      setMainSection('claims');
+      void selectRecord(id);
+    },
+    [selectRecord],
+  );
+
+  const handleRunningBannerClick = () => {
+    if (runningRuns.length === 0) return;
+    if (runningRuns.length === 1) {
+      const id = runningRuns[0].recordIds[0];
+      if (id) openRunningCase(id);
+      return;
+    }
+    setRunningRunsModalOpen(true);
   };
 
   const submitManagerDecision = async (status: string) => {
@@ -1337,15 +1422,71 @@ export default function App() {
         />
       )}
 
-      {activeRun && (
-        <div className="progress-banner">
+      {runningRuns.length > 0 && (
+        <div className="progress-banner progress-banner--clickable">
           <div className="loading-spinner small" />
-          <span>
-            {t('claims.analysisProgress', {
-              id: activeRun.instanceId?.slice(0, 8) ?? '…',
-              status: activeRun.variables?.latestRunStatus ?? 'Running',
-            })}
-          </span>
+          <button
+            type="button"
+            className="progress-banner-link"
+            onClick={handleRunningBannerClick}
+          >
+            {runningRuns.length === 1
+              ? t('claims.analysisProgress', {
+                  id: runningRuns[0].instanceId?.slice(0, 8) ?? '…',
+                  status: runningRuns[0].variables?.latestRunStatus ?? 'Running',
+                })
+              : t('claims.analysisProgressMultiple', { count: runningRuns.length })}
+          </button>
+        </div>
+      )}
+
+      {runningRunsModalOpen && runningRuns.length > 1 && (
+        <div
+          className="settings-overlay"
+          role="presentation"
+          onClick={() => setRunningRunsModalOpen(false)}
+        >
+          <div
+            className="settings-dialog running-cases-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="running-cases-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="settings-dialog-head">
+              <h2 id="running-cases-title">{t('claims.runningCasesTitle')}</h2>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setRunningRunsModalOpen(false)}
+              >
+                {t('common.close')}
+              </button>
+            </header>
+            <ul className="running-cases-list">
+              {runningRuns.map((run) => {
+                const id = run.recordIds[0];
+                if (!id) return null;
+                return (
+                  <li key={`${id}-${run.startedAt}`}>
+                    <button
+                      type="button"
+                      className="running-case-item"
+                      onClick={() => openRunningCase(id)}
+                    >
+                      <span className="running-case-label">{runRecordLabel(id)}</span>
+                      <span className="running-case-meta">
+                        {t('claims.analysisProgress', {
+                          id: run.instanceId?.slice(0, 8) ?? '…',
+                          status: run.variables?.latestRunStatus ?? run.status,
+                        })}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -1355,7 +1496,7 @@ export default function App() {
         </div>
       )}
 
-      {statusMsg && !activeRun && <div className="info-banner">{statusMsg}</div>}
+      {statusMsg && runningRuns.length === 0 && <div className="info-banner">{statusMsg}</div>}
 
       {driverAlerts.length > 0 && (
         <div className="driver-alerts" aria-live="polite">

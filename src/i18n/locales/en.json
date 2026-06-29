@@ -112,6 +112,8 @@
       "noFilterMatchGlobal": "No rows match filters (searched {count} records in database).",
       "noFilterMatchPage": "No rows match filters ({count} records on page).",
       "analysisProgress": "Analysis in progress (instance {id}) — {status}",
+      "analysisProgressMultiple": "Analysis in progress ({count} cases) — click to choose",
+      "runningCasesTitle": "Active analyses",
       "analysisStarted": "Analysis started — tracking progress…",
       "analysisDone": "Analysis completed.",
       "analysisDiscoverFailed": "Maestro instance not found — refresh shortly or run analysis manually.",

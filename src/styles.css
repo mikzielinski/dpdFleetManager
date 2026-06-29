@@ -138,6 +138,71 @@ body {
   color: #a65b00;
 }
 
+.progress-banner--clickable {
+  cursor: pointer;
+}
+
+.progress-banner-link {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.progress-banner-link:hover {
+  color: #7a4200;
+}
+
+.running-cases-dialog {
+  width: min(520px, 100%);
+}
+
+.running-cases-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.running-case-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e8eaf0;
+  border-radius: 8px;
+  background: #fafbfc;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.running-case-item:hover {
+  background: #fff3e0;
+  border-color: #f0c78a;
+}
+
+.running-case-label {
+  font-weight: 700;
+  color: #1a1b3a;
+}
+
+.running-case-meta {
+  font-size: 0.85rem;
+  color: #5c6078;
+}
+
 .info-banner {
   background: #e8f5e9;
   color: #2e7d32;
